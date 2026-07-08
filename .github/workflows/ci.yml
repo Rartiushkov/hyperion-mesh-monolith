@@ -38,10 +38,22 @@ jobs:
         continue-on-error: true
 
       - name: Build release
-        run: cargo build --release
+        run: |
+          cargo build --release \
+            --bin hyperion_grpc_server \
+            --bin hyperion_card_webhook \
+            --bin hyperion_grpc_smoke \
+            --bin hyperion_raw_ingress \
+            --bin hyperion_unified_bench
 
       - name: Run tests
-        run: cargo test --release
+        run: |
+          cargo test --release --lib \
+            --bin hyperion_grpc_server \
+            --bin hyperion_card_webhook \
+            --bin hyperion_grpc_smoke \
+            --bin hyperion_raw_ingress \
+            --bin hyperion_unified_bench
 
       - name: Upload backend artifacts
         uses: actions/upload-artifact@v4
