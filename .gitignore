@@ -1,0 +1,65 @@
+# Local build and cache artifacts
+/target/
+**/target/
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+
+# Temporary local files
+*.tmp
+*.temp
+
+# Secrets and environment — NEVER push to GitHub
+.env
+.env.*
+!.env.example
+/secrets/
+/keys/
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.der
+
+# Frontend build artifacts
+/node_modules/
+/frontend/node_modules/
+/frontend/dist/
+/frontend/.wrangler/
+
+# Local runtime logs / WAL
+/traces/*.log
+/traces/wal.jsonl
+/traces/hyperion_*.txt
+
+# Keep evidence and artifacts explicitly versioned by path
+# (do not blanket-ignore traces/ or firmware/)
+
+# ZERO-LEAK BOUNDARY: Protect core C++ sources (Satoshi Security Protocol)
+# These files contain proprietary mathematical core - NEVER push raw sources
+/tools/gplang_protein_ligand_flux_v1.cpp
+/tools/gplang_protein_ligand_flux_v2.cpp
+/tools/bio_folding_breakthrough_v*.cpp
+/tools/gplang_omega_*.cpp
+/tools/bio_quantum_singularity_fast.cpp
+/tools/entropy_resonance_tests.cpp
+/tools/gplang_mars_storm_landing_v*.cpp
+/tools/gplang_universal_stability_breakthrough.cpp
+/glang_native/*.cpp
+/glang_native/**/*.cpp
+/cosmological_*.cpp
+# Pre-compiled binaries (.exe, .dll, .so) are ALLOWED
+# *.exe  # <-- DO NOT uncomment - binaries are released
+# *.dll  # <-- DO NOT uncomment - shared libs are released
+
+# Large data artifacts (keep only frozen standards)
+/tools/pdbbind_complexes.parquet
+/tools/pdbbind_affinities.parquet

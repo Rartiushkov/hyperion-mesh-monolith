@@ -1,0 +1,40 @@
+version: "3.8"
+
+services:
+  hyperion-raw:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: hyperion-raw
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    ports:
+      - "8081:8081/tcp"
+      - "8081:8081/udp"
+      - "8080:8080/tcp"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # Optional: PostgreSQL for local WAL development.
+  # Replace with Supabase connection string in production.
+  postgres:
+    image: postgres:16-alpine
+    container_name: hyperion-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hyperion
+      POSTGRES_PASSWORD: changeme
+      POSTGRES_DB: hyperion
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    profiles:
+      - local-db
+
+volumes:
+  postgres_data:

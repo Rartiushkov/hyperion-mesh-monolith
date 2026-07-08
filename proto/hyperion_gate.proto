@@ -1,0 +1,105 @@
+syntax = "proto3";
+
+package hyperion.gate;
+
+service HyperionGate {
+  rpc ProcessKycApproval(KycApprovalRequest) returns (KycApprovalReply);
+  rpc ProcessCardAuthorization(CardAuthorizationRequest) returns (CardAuthorizationReply);
+  rpc ProcessBlockchainDeposit(BlockchainDepositRequest) returns (BlockchainDepositReply);
+  rpc ProcessSharedKyc(SharedKycRequest) returns (SharedKycReply);
+}
+
+enum VerificationVendor {
+  VERIFICATION_VENDOR_UNSPECIFIED = 0;
+  VERIFICATION_VENDOR_SUMSUB = 1;
+}
+
+enum FiatCurrency {
+  FIAT_CURRENCY_UNSPECIFIED = 0;
+  FIAT_CURRENCY_EUR = 1;
+  FIAT_CURRENCY_USD = 2;
+}
+
+enum AuthorizationVerdict {
+  AUTHORIZATION_VERDICT_UNSPECIFIED = 0;
+  AUTHORIZATION_VERDICT_APPROVED = 1;
+  AUTHORIZATION_VERDICT_DECLINED = 2;
+  AUTHORIZATION_VERDICT_REQUIRES_KYC_UPGRADE = 3;
+}
+
+enum FrontendCommand {
+  FRONTEND_COMMAND_UNSPECIFIED = 0;
+  FRONTEND_COMMAND_OPEN_CARD_PROVIDER_WIDGET = 1;
+}
+
+enum SharedKycProvider {
+  SHARED_KYC_PROVIDER_UNSPECIFIED = 0;
+  SHARED_KYC_PROVIDER_FYATU = 1;
+  SHARED_KYC_PROVIDER_KRIPICARD = 2;
+}
+
+message KycApprovalRequest {
+  bytes account_id = 1;
+  bytes user_id = 2;
+  VerificationVendor vendor = 3;
+  bool approved = 4;
+  uint64 event_unix_ms = 5;
+}
+
+message KycApprovalReply {
+  bool accepted = 1;
+  uint64 slot = 2;
+  uint64 processed_at_unix_ms = 3;
+}
+
+message CardAuthorizationRequest {
+  bytes account_id = 1;
+  bytes card_id = 2;
+  bytes merchant_id = 3;
+  FiatCurrency currency = 4;
+  uint64 amount_minor = 5;
+  uint64 request_unix_ms = 6;
+  bytes user_id = 7;
+}
+
+message CardAuthorizationReply {
+  AuthorizationVerdict verdict = 1;
+  uint64 debited_micro_usdt = 2;
+  bytes signature = 3;
+  bytes signing_hash = 4;
+  double fx_rate = 5;
+  uint64 processed_in_us = 6;
+  FrontendCommand frontend_command = 7;
+  string kyc_level = 8;
+  uint64 tx_count = 9;
+}
+
+message BlockchainDepositRequest {
+  bytes account_id = 1;
+  bytes tx_hash = 2;
+  uint64 amount_micro_usdt = 3;
+  uint64 block_unix_ms = 4;
+}
+
+message BlockchainDepositReply {
+  bool accepted = 1;
+  uint64 balance_micro_usdt = 2;
+  uint64 processed_at_unix_ms = 3;
+}
+
+message SharedKycRequest {
+  bytes account_id = 1;
+  bytes user_id = 2;
+  SharedKycProvider provider = 3;
+  string passport_payload_json = 4;
+  uint64 event_unix_ms = 5;
+}
+
+message SharedKycReply {
+  bool accepted = 1;
+  uint32 provider_http_status = 2;
+  string provider_response_body = 3;
+  string kyc_level = 4;
+  FrontendCommand frontend_command = 5;
+  uint64 processed_at_unix_ms = 6;
+}

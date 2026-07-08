@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hyperion Mesh</title>
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="stylesheet" href="/style.css" />
+  <meta name="theme-color" content="#0a0a0a" />
+</head>
+<body>
+  <main class="app">
+    <header>
+      <h1>Hyperion Mesh</h1>
+      <p class="status" id="status">Connecting…</p>
+    </header>
+
+    <section class="card">
+      <h2>Balance</h2>
+      <div class="balance" id="balance">0.00</div>
+      <div class="currency">Hyperion Coin</div>
+    </section>
+
+    <section class="actions">
+      <button id="btn-simulate" disabled>Simulate 10 EUR payment</button>
+      <button id="btn-deposit" disabled>Deposit +100 USDT</button>
+    </section>
+
+    <section class="log">
+      <h2>Event log</h2>
+      <ul id="log"></ul>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+target/
+frontend/node_modules/
+frontend/dist/
+.env
+.env.*
+secrets/
+keys/
+*.log
+traces/*.log
+traces/wal.jsonl
+.DS_Store
+Thumbs.db
+.git/
+.gitignore

@@ -1,0 +1,5 @@
+[env]
+ESP_LOG = "info"
+
+[target.riscv32imc-unknown-none-elf]
+runner = "espflash flash --monitor"

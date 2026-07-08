@@ -1,0 +1,12 @@
+{
+  "name": "hyperion-mesh-frontend",
+  "version": "0.1.0",
+  "description": "PWA frontend for Hyperion Mesh banking core",
+  "scripts": {
+    "build": "node build.js",
+    "dev": "npx serve dist"
+  },
+  "devDependencies": {
+    "serve": "^14.2.0"
+  }
+}

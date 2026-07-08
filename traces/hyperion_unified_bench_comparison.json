@@ -1,0 +1,45 @@
+{
+  "comparison": {
+    "PoPP": {
+      "benchmark": "hyperion_unified_bench",
+      "events": 100000,
+      "host": "127.0.0.1:8081",
+      "latency_ns": {
+        "max": 3989900,
+        "mean": 48358.288,
+        "min": 30300,
+        "p50": 44800.0,
+        "p99": 86100.0,
+        "std": 22172.752193141474
+      },
+      "mode": "PoPP",
+      "rps": 20678.978544484453,
+      "throughput_total_s": 20617.975146597928,
+      "timestamp_epoch_s": 1783428469,
+      "transport": "TCP",
+      "verdict": "NEEDS_TUNING",
+      "wall_total_ms": 4850
+    },
+    "BANK": {
+      "benchmark": "hyperion_unified_bench",
+      "events": 100000,
+      "host": "127.0.0.1:8081",
+      "latency_ns": {
+        "max": 2330600,
+        "mean": 55326.162,
+        "min": 32800,
+        "p50": 55100.0,
+        "p99": 90500.99999999948,
+        "std": 17014.568678200234
+      },
+      "mode": "BANK",
+      "rps": 18074.631672444586,
+      "throughput_total_s": 18027.320765166023,
+      "timestamp_epoch_s": 1783428476,
+      "transport": "TCP",
+      "verdict": "NEEDS_TUNING",
+      "wall_total_ms": 5547
+    }
+  },
+  "note": "Bank mode mints PoPP blocks from server-side jitter; PoPP mode validates client blocks."
+}

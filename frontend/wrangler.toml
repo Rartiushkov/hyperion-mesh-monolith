@@ -1,0 +1,9 @@
+name = "hyperion-mesh-frontend"
+compatibility_date = "2024-07-01"
+
+# Cloudflare Pages: deploy the static dist/ directory
+# Run: npx wrangler pages deploy dist
+
+[env.production]
+# Set custom domain in Cloudflare dashboard after first deploy
+# routes = [{ pattern = "app.hyperion-mesh.example", custom_domain = true }]

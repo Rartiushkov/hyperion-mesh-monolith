@@ -1,0 +1,65 @@
+// GPLang v3.1 experimental demo
+// Dynamic resonance entities: FluxScalar, ResonanceState, NoiseParticle
+
+// ---------- 1) FluxScalar: long-run stable signal tracking ----------
+flux signal = 0.0 pm 0.10 vel 0.0 curv 0.0
+
+for step in 1..1000 {
+    // Synthetic noisy observation (5% noise)
+    obs = sin(step * 2 * pi / 128) + noise(0.05)
+    signal.update(obs)
+}
+
+signal.show("flux_signal_final")
+print("entropy_anchor_step_est =", signal.anchor_step())
+print("signal_survival_pct_est =", signal.survival())
+
+
+// ---------- 2) ResonanceState: guarded resonance loop ----------
+res_state rs
+rs.energy_budget = 0.25
+rs.trust_radius  = 0.24
+
+fuzzy a = 100 pm 50
+fuzzy b = 100 pm 50
+
+for t in 1..100 {
+    // Runtime-governed resonance step (anti-drift)
+    mixed = rs.guard(a ~~ b)
+    a = 0.98 * a + 0.02 * mixed
+    b = 0.97 * b + 0.03 * mixed
+}
+
+mixed.show("guarded_resonance")
+print("edn_ratio_est =", rs.edn_ratio())
+
+
+// ---------- 3) NoiseParticle: correlated-noise cancellation ----------
+// 1024 channels, shared engine noise + source-local bias
+
+noise_particle channels[1024]
+for i in 0..1023 {
+    channels[i].source_id = i % 32
+}
+
+for t in 1..4000 {
+    clean_ref = sin(t * 2 * pi / 256)
+    common    = noise(0.99)
+
+    for i in 0..1023 {
+        local = noise(0.10) + noise_by_source(channels[i].source_id, 0.35)
+        x = clean_ref + common + local
+        channels[i].observe(x)
+    }
+
+    // Estimate and remove common-mode + source bias
+    resonance_out = resonance_merge(channels)
+    classic_out   = mean(channels)
+
+    log_metric("snr_classic", classic_out, clean_ref)
+    log_metric("snr_resonance", resonance_out, clean_ref)
+}
+
+print("resonance_gain =", metric("snr_resonance") / metric("snr_classic"))
+print("discovery_step =", detect_gain_step(1.01))
+

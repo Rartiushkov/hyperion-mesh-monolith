@@ -1,0 +1,17 @@
+{
+  "name": "hyperion_monolith",
+  "date": "2026-07-07",
+  "verdict": "HYPERION_RAMAN_MODEL_INTEGRATED",
+  "includes": [
+    "Rust monolith core (src/, raman-core/, proto/) \u2014 Hyperion only, no GPLang compiler",
+    "Raw ingress gateway (hyperion_raw_ingress) with PoPP and bank-mode jitter minting",
+    "RAMAN anomaly detector (src/blockchain/raman_anomaly.rs) wired into every WAL record",
+    "RAMAN Windows scheduling profile in the raw ingress",
+    "Unified benchmark (hyperion_unified_bench)",
+    "gRPC gateway (hyperion_grpc_server, hyperion_grpc_smoke, hyperion_grpc_bench)",
+    "PWA frontend (frontend/)",
+    "Docker + systemd deployment (Dockerfile, deploy/)",
+    "Supabase migrations (infra/)",
+    "GitHub Actions CI (.github/workflows/ci.yml)"
+  ]
+}

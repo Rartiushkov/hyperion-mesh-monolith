@@ -1,0 +1,21 @@
+[Unit]
+Description=Hyperion Mesh Raw Ingress Gateway
+After=network.target
+
+[Service]
+Type=simple
+User=hyperion
+Group=hyperion
+WorkingDirectory=/opt/hyperion-mesh
+Environment="RUST_LOG=info"
+Environment="HYPERION_RAW_ADDR=0.0.0.0:8081"
+EnvironmentFile=-/opt/hyperion-mesh/.env
+ExecStart=/usr/local/bin/hyperion_raw_ingress
+Restart=always
+RestartSec=5
+# Allow binding to privileged ports if needed.
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

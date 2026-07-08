@@ -1,0 +1,13 @@
+[package]
+name = "raman-core"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "no_std fixed-buffer Raman core executor"
+
+[features]
+default = []
+
+[dependencies]
+heapless = "0.8"
+
