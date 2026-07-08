@@ -15,23 +15,45 @@ pub struct SupabaseClient {
 pub struct UserKycState {
     pub tx_count: u64,
     pub kyc_level: String,
-    pub provider_user_id: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct TransactionAuditRecord<'a> {
+    pub address_l2: &'a str,
+    pub account_id: &'a str,
+    pub transaction_kind: &'a str,
+    pub status: &'a str,
+    pub amount_minor: u64,
+    pub currency: &'a str,
+    pub provider: &'a str,
+    pub reference_id: &'a str,
+    pub metadata_json: &'a str,
 }
 
 #[derive(Serialize)]
 struct UserUpsertPayload<'a> {
-    external_ref: &'a str,
-    kyc_status: &'a str,
+    address_l2: &'a str,
     tx_count: i32,
     kyc_level: &'a str,
-    provider_user_id: Option<&'a str>,
 }
 
 #[derive(Serialize)]
 struct UserStatePatch<'a> {
     tx_count: Option<i32>,
     kyc_level: Option<&'a str>,
-    provider_user_id: Option<&'a str>,
+}
+
+#[derive(Serialize)]
+struct TransactionInsertPayload<'a> {
+    address_l2: &'a str,
+    account_id: &'a str,
+    transaction_kind: &'a str,
+    status: &'a str,
+    amount_minor: i64,
+    currency: &'a str,
+    provider: &'a str,
+    reference_id: &'a str,
+    metadata: serde_json::Value,
 }
 
 impl SupabaseClient {
@@ -53,16 +75,14 @@ impl SupabaseClient {
 
     pub async fn ensure_user_record(
         &self,
-        user_id: &str,
+        address_l2: &str,
         initial_kyc_level: &str,
     ) -> Result<(), String> {
         let url = format!("{}/users", self.rest_url);
         let payload = [UserUpsertPayload {
-            external_ref: user_id,
-            kyc_status: "approved",
+            address_l2,
             tx_count: 0,
             kyc_level: initial_kyc_level,
-            provider_user_id: None,
         }];
         let response = self
             .http
@@ -87,13 +107,13 @@ impl SupabaseClient {
 
     pub async fn fetch_user_kyc_state(
         &self,
-        user_id: &str,
+        address_l2: &str,
     ) -> Result<Option<UserKycState>, String> {
         let mut url = reqwest::Url::parse(&format!("{}/users", self.rest_url))
             .map_err(|e| format!("supabase users url parse failed: {e}"))?;
         url.query_pairs_mut()
-            .append_pair("select", "tx_count,kyc_level,provider_user_id")
-            .append_pair("external_ref", &format!("eq.{user_id}"))
+            .append_pair("select", "tx_count,kyc_level")
+            .append_pair("address_l2", &format!("eq.{address_l2}"))
             .append_pair("limit", "1");
         let response = self
             .http
@@ -117,73 +137,91 @@ impl SupabaseClient {
         Ok(rows.into_iter().next().map(UserKycState::from))
     }
 
-    pub async fn increment_user_tx_count(&self, user_id: &str) -> Result<UserKycState, String> {
+    pub async fn increment_user_tx_count(&self, address_l2: &str) -> Result<UserKycState, String> {
         let current = self
-            .fetch_user_kyc_state(user_id)
+            .fetch_user_kyc_state(address_l2)
             .await?
             .unwrap_or(UserKycState {
                 tx_count: 0,
                 kyc_level: BASIC_KYC_LEVEL.to_string(),
-                provider_user_id: None,
             });
         let next_count = current.tx_count.saturating_add(1);
         self.patch_user_state(
-            user_id,
+            address_l2,
             UserStatePatch {
                 tx_count: Some(next_count as i32),
                 kyc_level: None,
-                provider_user_id: None,
             },
         )
         .await?;
         Ok(UserKycState {
             tx_count: next_count,
             kyc_level: current.kyc_level,
-            provider_user_id: current.provider_user_id,
         })
     }
 
     pub async fn update_user_kyc_level(
         &self,
-        user_id: &str,
+        address_l2: &str,
         kyc_level: &str,
     ) -> Result<(), String> {
         self.patch_user_state(
-            user_id,
+            address_l2,
             UserStatePatch {
                 tx_count: None,
                 kyc_level: Some(kyc_level),
-                provider_user_id: None,
             },
         )
         .await
     }
 
-    pub async fn update_provider_user_id(
+    pub async fn record_transaction(
         &self,
-        user_id: &str,
-        provider_user_id: &str,
+        record: &TransactionAuditRecord<'_>,
     ) -> Result<(), String> {
-        self.patch_user_state(
-            user_id,
-            UserStatePatch {
-                tx_count: None,
-                kyc_level: None,
-                provider_user_id: Some(provider_user_id),
-            },
-        )
-        .await
+        let metadata = serde_json::from_str::<serde_json::Value>(record.metadata_json)
+            .unwrap_or_else(|_| serde_json::json!({ "raw": record.metadata_json }));
+        let payload = [TransactionInsertPayload {
+            address_l2: record.address_l2,
+            account_id: record.account_id,
+            transaction_kind: record.transaction_kind,
+            status: record.status,
+            amount_minor: record.amount_minor as i64,
+            currency: record.currency,
+            provider: record.provider,
+            reference_id: record.reference_id,
+            metadata,
+        }];
+        let response = self
+            .http
+            .post(format!("{}/transactions", self.rest_url))
+            .header("apikey", &self.service_role_key)
+            .header(AUTHORIZATION, format!("Bearer {}", self.service_role_key))
+            .header(CONTENT_TYPE, "application/json")
+            .header("Prefer", "return=minimal")
+            .json(&payload)
+            .send()
+            .await
+            .map_err(|e| format!("supabase transaction insert request failed: {e}"))?;
+        let status = response.status();
+        if !status.is_success() {
+            let body = response.text().await.unwrap_or_default();
+            return Err(format!(
+                "supabase transaction insert failed: status={status} body={body}"
+            ));
+        }
+        Ok(())
     }
 
     async fn patch_user_state(
         &self,
-        user_id: &str,
+        address_l2: &str,
         patch: UserStatePatch<'_>,
     ) -> Result<(), String> {
         let mut url = reqwest::Url::parse(&format!("{}/users", self.rest_url))
             .map_err(|e| format!("supabase users url parse failed: {e}"))?;
         url.query_pairs_mut()
-            .append_pair("external_ref", &format!("eq.{user_id}"));
+            .append_pair("address_l2", &format!("eq.{address_l2}"));
         let response = self
             .http
             .patch(url)
@@ -210,7 +248,6 @@ impl SupabaseClient {
 struct UserKycStateRow {
     tx_count: Option<i32>,
     kyc_level: Option<String>,
-    provider_user_id: Option<String>,
 }
 
 impl From<UserKycStateRow> for UserKycState {
@@ -220,7 +257,6 @@ impl From<UserKycStateRow> for UserKycState {
             kyc_level: value
                 .kyc_level
                 .unwrap_or_else(|| BASIC_KYC_LEVEL.to_string()),
-            provider_user_id: value.provider_user_id,
         }
     }
 }

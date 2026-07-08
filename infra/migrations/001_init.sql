@@ -1,61 +1,49 @@
--- Hyperion Mesh MVP schema for Supabase / PostgreSQL
--- Run this in Supabase SQL Editor or via psql $DATABASE_URL
+-- Hyperion Mesh operational schema for Supabase / PostgreSQL
+-- Data minimization: no passport, no full name, no card PAN, no scans.
 
--- Users / card holders
-CREATE TABLE IF NOT EXISTS users (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    created_at      TIMESTAMPTZ DEFAULT now(),
-    updated_at      TIMESTAMPTZ DEFAULT now(),
-    kyc_status      VARCHAR(32) DEFAULT 'pending',  -- pending | approved | rejected
-    tx_count        INT DEFAULT 0,
-    kyc_level       TEXT DEFAULT 'BASIC',
-    provider_user_id VARCHAR(128),
-    phone           VARCHAR(64),
-    email           VARCHAR(256),
-    external_ref    VARCHAR(128) UNIQUE,             -- Wallester/Airwallex customer id
-    stable_balance  BIGINT DEFAULT 0,                  -- micro-units of Hyperion Coin
-    eurc_balance    BIGINT DEFAULT 0,                  -- micro-EURC
-    metadata        JSONB DEFAULT '{}'
+create extension if not exists pgcrypto;
+
+create table if not exists users (
+    id uuid primary key default gen_random_uuid(),
+    address_l2 text not null unique,
+    tx_count int not null default 0,
+    kyc_level text not null default 'BASIC'
 );
 
-CREATE INDEX IF NOT EXISTS idx_users_external_ref ON users(external_ref);
-CREATE INDEX IF NOT EXISTS idx_users_kyc_status ON users(kyc_status);
-CREATE INDEX IF NOT EXISTS idx_users_kyc_level ON users(kyc_level);
+create index if not exists idx_users_address_l2 on users(address_l2);
+create index if not exists idx_users_kyc_level on users(kyc_level);
 
-ALTER TABLE users ADD COLUMN IF NOT EXISTS tx_count INT DEFAULT 0;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_level TEXT DEFAULT 'BASIC';
-ALTER TABLE users ADD COLUMN IF NOT EXISTS provider_user_id VARCHAR(128);
+alter table users add column if not exists address_l2 text;
+alter table users add column if not exists tx_count int default 0;
+alter table users add column if not exists kyc_level text default 'BASIC';
 
--- Payment / card authorization history (WAL)
-CREATE TABLE IF NOT EXISTS payments (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    created_at      TIMESTAMPTZ DEFAULT now(),
-    user_id         UUID REFERENCES users(id) ON DELETE SET NULL,
-    type            VARCHAR(32) NOT NULL,              -- deposit | card_auth | swap | withdraw
-    status          VARCHAR(32) NOT NULL,              -- approved | rejected | pending
-    amount_usdt     BIGINT,                            -- micro-USDT / Hyperion Coin
-    amount_eurc     BIGINT,                            -- micro-EURC
-    fx_rate         BIGINT,                            -- 1e6 fixed-point
-    merchant_id     VARCHAR(128),
-    merchant_country VARCHAR(4),
-    raw_ingress_ns  BIGINT,                            -- measured latency in nanoseconds
-    block_hash      BYTEA,                             -- optional PoPP chain block hash
-    metadata        JSONB DEFAULT '{}'
+create unique index if not exists idx_users_address_l2_unique on users(address_l2);
+
+alter table users drop column if exists created_at;
+alter table users drop column if exists updated_at;
+alter table users drop column if exists kyc_status;
+alter table users drop column if exists provider_user_id;
+alter table users drop column if exists phone;
+alter table users drop column if exists email;
+alter table users drop column if exists external_ref;
+alter table users drop column if exists stable_balance;
+alter table users drop column if exists eurc_balance;
+alter table users drop column if exists metadata;
+
+create table if not exists transactions (
+    id uuid primary key default gen_random_uuid(),
+    created_at timestamptz not null default now(),
+    address_l2 text not null references users(address_l2) on delete cascade,
+    account_id text not null,
+    transaction_kind text not null,
+    status text not null,
+    amount_minor bigint not null default 0,
+    currency text not null,
+    provider text not null,
+    reference_id text not null default '',
+    metadata jsonb not null default '{}'::jsonb
 );
 
-CREATE INDEX IF NOT EXISTS idx_payments_user_id ON payments(user_id);
-CREATE INDEX IF NOT EXISTS idx_payments_created_at ON payments(created_at DESC);
-
--- Function to auto-update updated_at timestamp
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = now();
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS update_users_updated_at ON users;
-CREATE TRIGGER update_users_updated_at
-BEFORE UPDATE ON users
-FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+create index if not exists idx_transactions_address_l2 on transactions(address_l2);
+create index if not exists idx_transactions_created_at on transactions(created_at desc);
+create index if not exists idx_transactions_status on transactions(status);

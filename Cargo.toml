@@ -40,6 +40,7 @@ tonic = { version = "0.12", features = ["transport"] }
 prost = "0.13"
 axum = "0.7"
 hmac = "0.12"
+uuid = { version = "1", features = ["v4", "serde"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_System_Threading"] }

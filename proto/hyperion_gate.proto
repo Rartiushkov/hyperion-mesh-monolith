@@ -100,6 +100,7 @@ message SharedKycRequest {
   string applicant_type = 8;
   string resume_session_id = 9;
   uint64 event_unix_ms = 10;
+  string passport_payload_json = 11;
 }
 
 message SharedKycReply {

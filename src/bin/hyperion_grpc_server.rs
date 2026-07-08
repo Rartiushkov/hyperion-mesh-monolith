@@ -1,5 +1,6 @@
 use radnet_morphic_kernel::db::supabase::{
-    basic_kyc_level, is_basic_kyc, verified_kyc_level, SupabaseClient, UserKycState,
+    basic_kyc_level, is_basic_kyc, verified_kyc_level, SupabaseClient, TransactionAuditRecord,
+    UserKycState,
 };
 use secp256k1::{Message, Secp256k1, SecretKey};
 use serde::{Deserialize, Serialize};
@@ -75,7 +76,7 @@ impl HyperionGate for HyperionGrpcService {
         if req.account_id.is_empty() {
             return Err(Status::invalid_argument("account_id is required"));
         }
-        let user_key = identity_key(&req.user_id, "user_id")?;
+        let user_key = identity_key(&req.user_id, "address_l2")?;
         let slot = self
             .engine
             .ensure_account_slot(&req.account_id)
@@ -99,11 +100,6 @@ impl HyperionGate for HyperionGrpcService {
             db.ensure_user_record(&user_key, basic_kyc_level())
                 .await
                 .map_err(Status::unavailable)?;
-            if !req.provider_user_id.is_empty() {
-                db.update_provider_user_id(&user_key, &req.provider_user_id)
-                    .await
-                    .map_err(Status::unavailable)?;
-            }
             if req.approved {
                 db.update_user_kyc_level(&user_key, verified_kyc_level())
                     .await
@@ -133,7 +129,7 @@ impl HyperionGate for HyperionGrpcService {
         if req.account_id.is_empty() {
             return Err(Status::invalid_argument("account_id is required"));
         }
-        let user_key = identity_key(&req.user_id, "user_id")?;
+        let user_key = identity_key(&req.user_id, "address_l2")?;
         let started = Instant::now();
         let slot = self
             .engine
@@ -156,7 +152,7 @@ impl HyperionGate for HyperionGrpcService {
         if current_state.tx_count >= SHARED_KYC_LIMIT_TX_COUNT
             && is_basic_kyc(&current_state.kyc_level)
         {
-            return Ok(Response::new(CardAuthorizationReply {
+            let decline = CardAuthorizationReply {
                 verdict: AuthorizationVerdict::RequiresKycUpgrade as i32,
                 debited_micro_usdt: 0,
                 signature: Vec::new(),
@@ -166,7 +162,25 @@ impl HyperionGate for HyperionGrpcService {
                 frontend_command: FrontendCommand::OpenCardProviderWidget as i32,
                 kyc_level: current_state.kyc_level,
                 tx_count: current_state.tx_count,
-            }));
+            };
+            self.engine
+                .record_transaction(
+                    &user_key,
+                    &req.account_id,
+                    "card_authorization",
+                    "requires_kyc_upgrade",
+                    req.amount_minor,
+                    fiat_currency_code(req.currency),
+                    "codegotech",
+                    String::from_utf8_lossy(&req.card_id).as_ref(),
+                    serde_json::json!({
+                        "merchant_id": String::from_utf8_lossy(&req.merchant_id),
+                        "request_unix_ms": req.request_unix_ms,
+                    }),
+                )
+                .await
+                .map_err(Status::unavailable)?;
+            return Ok(Response::new(decline));
         }
 
         let fx_rate = match FiatCurrency::try_from(req.currency)
@@ -190,7 +204,7 @@ impl HyperionGate for HyperionGrpcService {
         );
 
         if !approved {
-            return Ok(Response::new(CardAuthorizationReply {
+            let decline = CardAuthorizationReply {
                 verdict: AuthorizationVerdict::Declined as i32,
                 debited_micro_usdt: 0,
                 signature: Vec::new(),
@@ -200,7 +214,25 @@ impl HyperionGate for HyperionGrpcService {
                 frontend_command: FrontendCommand::Unspecified as i32,
                 kyc_level: current_state.kyc_level,
                 tx_count: current_state.tx_count,
-            }));
+            };
+            self.engine
+                .record_transaction(
+                    &user_key,
+                    &req.account_id,
+                    "card_authorization",
+                    "declined",
+                    req.amount_minor,
+                    fiat_currency_code(req.currency),
+                    "codegotech",
+                    String::from_utf8_lossy(&req.card_id).as_ref(),
+                    serde_json::json!({
+                        "merchant_id": String::from_utf8_lossy(&req.merchant_id),
+                        "request_unix_ms": req.request_unix_ms,
+                    }),
+                )
+                .await
+                .map_err(Status::unavailable)?;
+            return Ok(Response::new(decline));
         }
 
         let tx_state = match self.engine.bump_user_tx_count(account, &user_key).await {
@@ -212,6 +244,28 @@ impl HyperionGate for HyperionGrpcService {
         };
         let (signature, hash) = self.engine.signature_pool.take();
         let processed_in_us = started.elapsed().as_micros() as u64;
+        self.engine
+            .record_transaction(
+                &user_key,
+                &req.account_id,
+                "card_authorization",
+                "approved",
+                req.amount_minor,
+                fiat_currency_code(req.currency),
+                "codegotech",
+                String::from_utf8_lossy(&req.card_id).as_ref(),
+                serde_json::json!({
+                    "merchant_id": String::from_utf8_lossy(&req.merchant_id),
+                    "request_unix_ms": req.request_unix_ms,
+                    "debited_micro_usdt": total_micro_usdt,
+                }),
+            )
+            .await
+            .map_err(|error| {
+                credit_account(account, total_micro_usdt);
+                account.tx_count.fetch_sub(1, Ordering::AcqRel);
+                Status::unavailable(error)
+            })?;
 
         Ok(Response::new(CardAuthorizationReply {
             verdict: AuthorizationVerdict::Approved as i32,
@@ -260,7 +314,7 @@ impl HyperionGate for HyperionGrpcService {
         request: Request<SharedKycRequest>,
     ) -> Result<Response<SharedKycReply>, Status> {
         let req = request.into_inner();
-        let user_key = identity_key(&req.user_id, "user_id")?;
+        let user_key = identity_key(&req.user_id, "address_l2")?;
         identity_key(&req.account_id, "account_id")?;
         if req.email.trim().is_empty() {
             return Err(Status::invalid_argument("email is required"));
@@ -279,24 +333,34 @@ impl HyperionGate for HyperionGrpcService {
                 "provider must be CODEGO for the hosted iframe flow",
             ));
         }
-        let provider_reply = self
-            .engine
-            .shared_kyc
-            .create_session(CodegoKycSessionRequest {
-                external_user_id: compose_external_user_id(&user_key, &req.account_id),
-                email: req.email,
-                origin: req.origin,
-                locale: if req.locale.trim().is_empty() {
-                    "en".to_string()
-                } else {
-                    req.locale
-                },
-                return_url: req.return_url,
-                applicant_type: normalized_applicant_type(&req.applicant_type),
-                resume_session_id: normalized_optional_string(&req.resume_session_id),
-            })
-            .await
-            .map_err(Status::unavailable)?;
+        let provider_reply = if req.passport_payload_json.trim().is_empty() {
+            self.engine
+                .shared_kyc
+                .create_session(CodegoKycSessionRequest {
+                    external_user_id: compose_external_user_id(&user_key, &req.account_id),
+                    email: req.email,
+                    origin: req.origin,
+                    locale: if req.locale.trim().is_empty() {
+                        "en".to_string()
+                    } else {
+                        req.locale
+                    },
+                    return_url: req.return_url,
+                    applicant_type: normalized_applicant_type(&req.applicant_type),
+                    resume_session_id: normalized_optional_string(&req.resume_session_id),
+                })
+                .await
+                .map_err(Status::unavailable)?
+        } else {
+            self.engine
+                .shared_kyc
+                .process_shared_passport(
+                    compose_external_user_id(&user_key, &req.account_id),
+                    req.passport_payload_json,
+                )
+                .await
+                .map_err(Status::unavailable)?
+        };
 
         Ok(Response::new(SharedKycReply {
             accepted: provider_reply.accepted,
@@ -398,7 +462,6 @@ impl HyperionEngine {
         Ok(UserKycState {
             tx_count: account.tx_count.load(Ordering::Acquire),
             kyc_level: self.local_kyc_level(account).to_string(),
-            provider_user_id: None,
         })
     }
 
@@ -423,9 +486,38 @@ impl HyperionEngine {
             Ok(UserKycState {
                 tx_count: local_next,
                 kyc_level: self.local_kyc_level(account).to_string(),
-                provider_user_id: None,
             })
         }
+    }
+
+    async fn record_transaction(
+        &self,
+        address_l2: &str,
+        account_id: &[u8],
+        transaction_kind: &str,
+        status: &str,
+        amount_minor: u64,
+        currency: &str,
+        provider: &str,
+        reference_id: &str,
+        metadata: serde_json::Value,
+    ) -> Result<(), String> {
+        let Some(db) = &self.supabase else {
+            return Ok(());
+        };
+        let metadata_json = metadata.to_string();
+        db.record_transaction(&TransactionAuditRecord {
+            address_l2,
+            account_id: &String::from_utf8_lossy(account_id),
+            transaction_kind,
+            status,
+            amount_minor,
+            currency,
+            provider,
+            reference_id,
+            metadata_json: &metadata_json,
+        })
+        .await
     }
 
     fn local_kyc_level(&self, account: &AccountSlot) -> &'static str {
@@ -590,6 +682,49 @@ impl SharedKycTransit {
                 .unwrap_or_default(),
         })
     }
+
+    async fn process_shared_passport(
+        &self,
+        external_user_id: String,
+        passport_payload_json: String,
+    ) -> Result<ProviderTransitReply, String> {
+        let base = std::env::var("CODEGO_KYC_API_BASE")
+            .unwrap_or_else(|_| "https://kyc-sandbox.codegotech.com".to_string());
+        let path = std::env::var("CODEGO_KYC_TRANSIT_PATH")
+            .unwrap_or_else(|_| "/api/shared-kyc/process".to_string());
+        let api_key = std::env::var("CODEGO_KYC_API_KEY")
+            .or_else(|_| std::env::var("CODEGO_API_KEY"))
+            .map_err(|_| "CODEGO_KYC_API_KEY or CODEGO_API_KEY is not set".to_string())?;
+
+        let mut payload = serde_json::from_str::<serde_json::Value>(&passport_payload_json)
+            .map_err(|e| format!("passport payload json decode failed: {e}"))?;
+        if let Some(object) = payload.as_object_mut() {
+            object.insert(
+                "externalUserId".to_string(),
+                serde_json::Value::String(external_user_id),
+            );
+        }
+        let response = self
+            .client
+            .post(format!("{}{}", base.trim_end_matches('/'), path))
+            .header("X-Api-Key", api_key)
+            .header("Content-Type", "application/json")
+            .json(&payload)
+            .send()
+            .await
+            .map_err(|e| format!("codego shared kyc transit request failed: {e}"))?;
+        drop(payload);
+        let status = response.status().as_u16() as u32;
+        let body = response.text().await.unwrap_or_default();
+        Ok(ProviderTransitReply {
+            accepted: status == 201 || status == 200,
+            provider_http_status: status,
+            provider_response_body: body,
+            iframe_url: String::new(),
+            session_id: String::new(),
+            expires_at: String::new(),
+        })
+    }
 }
 
 #[derive(Serialize)]
@@ -640,6 +775,14 @@ fn normalized_optional_string(value: &str) -> Option<String> {
         None
     } else {
         Some(trimmed.to_string())
+    }
+}
+
+fn fiat_currency_code(currency: i32) -> &'static str {
+    match FiatCurrency::try_from(currency).unwrap_or(FiatCurrency::Unspecified) {
+        FiatCurrency::Usd => "USD",
+        FiatCurrency::Eur => "EUR",
+        FiatCurrency::Unspecified => "UNSPECIFIED",
     }
 }
 
