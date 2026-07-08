@@ -2,6 +2,7 @@ use radnet_morphic_kernel::db::supabase::{
     basic_kyc_level, is_basic_kyc, verified_kyc_level, SupabaseClient, UserKycState,
 };
 use secp256k1::{Message, Secp256k1, SecretKey};
+use serde::{Deserialize, Serialize};
 use sha3::{Digest, Keccak256};
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, AtomicU8, AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -27,9 +28,8 @@ pub mod hyperion_gate {
 use hyperion_gate::hyperion_gate_server::{HyperionGate, HyperionGateServer};
 use hyperion_gate::{
     AuthorizationVerdict, BlockchainDepositReply, BlockchainDepositRequest, CardAuthorizationReply,
-    CardAuthorizationRequest, FiatCurrency, FrontendCommand, KycApprovalReply,
-    KycApprovalRequest, SharedKycProvider, SharedKycReply, SharedKycRequest,
-    VerificationVendor,
+    CardAuthorizationRequest, FiatCurrency, FrontendCommand, KycApprovalReply, KycApprovalRequest,
+    SharedKycProvider, SharedKycReply, SharedKycRequest, VerificationVendor,
 };
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 8)]
@@ -99,6 +99,11 @@ impl HyperionGate for HyperionGrpcService {
             db.ensure_user_record(&user_key, basic_kyc_level())
                 .await
                 .map_err(Status::unavailable)?;
+            if !req.provider_user_id.is_empty() {
+                db.update_provider_user_id(&user_key, &req.provider_user_id)
+                    .await
+                    .map_err(Status::unavailable)?;
+            }
             if req.approved {
                 db.update_user_kyc_level(&user_key, verified_kyc_level())
                     .await
@@ -256,49 +261,53 @@ impl HyperionGate for HyperionGrpcService {
     ) -> Result<Response<SharedKycReply>, Status> {
         let req = request.into_inner();
         let user_key = identity_key(&req.user_id, "user_id")?;
-        let slot = self
-            .engine
-            .ensure_account_slot(&req.account_id)
-            .map_err(Status::resource_exhausted)?;
-        let account = &self.engine.accounts[slot];
-        if req.passport_payload_json.trim().is_empty() {
-            return Err(Status::invalid_argument("passport_payload_json is required"));
+        identity_key(&req.account_id, "account_id")?;
+        if req.email.trim().is_empty() {
+            return Err(Status::invalid_argument("email is required"));
+        }
+        if req.origin.trim().is_empty() {
+            return Err(Status::invalid_argument("origin is required"));
+        }
+        if req.return_url.trim().is_empty() {
+            return Err(Status::invalid_argument("return_url is required"));
         }
 
-        let provider = SharedKycProvider::try_from(req.provider)
-            .unwrap_or(SharedKycProvider::Unspecified);
+        let provider =
+            SharedKycProvider::try_from(req.provider).unwrap_or(SharedKycProvider::Unspecified);
+        if provider != SharedKycProvider::Codego {
+            return Err(Status::invalid_argument(
+                "provider must be CODEGO for the hosted iframe flow",
+            ));
+        }
         let provider_reply = self
             .engine
             .shared_kyc
-            .forward_json(provider, &req.passport_payload_json)
+            .create_session(CodegoKycSessionRequest {
+                external_user_id: compose_external_user_id(&user_key, &req.account_id),
+                email: req.email,
+                origin: req.origin,
+                locale: if req.locale.trim().is_empty() {
+                    "en".to_string()
+                } else {
+                    req.locale
+                },
+                return_url: req.return_url,
+                applicant_type: normalized_applicant_type(&req.applicant_type),
+                resume_session_id: normalized_optional_string(&req.resume_session_id),
+            })
             .await
             .map_err(Status::unavailable)?;
-
-        if provider_reply.accepted {
-            account.kyc_level.store(KYC_LEVEL_VERIFIED, Ordering::Release);
-            account.kyc_approved.store(true, Ordering::Release);
-            account.last_event_unix_ms.store(
-                req.event_unix_ms.max(unix_ms_now() as u64),
-                Ordering::Release,
-            );
-            if let Some(db) = &self.engine.supabase {
-                db.update_user_kyc_level(&user_key, verified_kyc_level())
-                    .await
-                    .map_err(Status::unavailable)?;
-            }
-        }
 
         Ok(Response::new(SharedKycReply {
             accepted: provider_reply.accepted,
             provider_http_status: provider_reply.provider_http_status,
             provider_response_body: provider_reply.provider_response_body,
-            kyc_level: if provider_reply.accepted {
-                verified_kyc_level().to_string()
-            } else {
-                self.engine.local_kyc_level(account).to_string()
-            },
-            frontend_command: FrontendCommand::Unspecified as i32,
+            kyc_level: basic_kyc_level().to_string(),
+            frontend_command: FrontendCommand::OpenCardProviderWidget as i32,
             processed_at_unix_ms: unix_ms_now() as u64,
+            iframe_url: provider_reply.iframe_url,
+            session_id: provider_reply.session_id,
+            expires_at: provider_reply.expires_at,
         }))
     }
 }
@@ -352,9 +361,7 @@ impl HyperionEngine {
                         self.accounts[slot]
                             .kyc_level
                             .store(KYC_LEVEL_BASIC, Ordering::Release);
-                        self.accounts[slot]
-                            .tx_count
-                            .store(0, Ordering::Release);
+                        self.accounts[slot].tx_count.store(0, Ordering::Release);
                         self.accounts[slot]
                             .balance_micro_usdt
                             .store(INITIAL_ACCOUNT_BALANCE_MICRO_USDT, Ordering::Release);
@@ -391,6 +398,7 @@ impl HyperionEngine {
         Ok(UserKycState {
             tx_count: account.tx_count.load(Ordering::Acquire),
             kyc_level: self.local_kyc_level(account).to_string(),
+            provider_user_id: None,
         })
     }
 
@@ -415,6 +423,7 @@ impl HyperionEngine {
             Ok(UserKycState {
                 tx_count: local_next,
                 kyc_level: self.local_kyc_level(account).to_string(),
+                provider_user_id: None,
             })
         }
     }
@@ -542,43 +551,96 @@ impl SharedKycTransit {
         Ok(Self { client })
     }
 
-    async fn forward_json(
+    async fn create_session(
         &self,
-        provider: SharedKycProvider,
-        passport_payload_json: &str,
+        payload: CodegoKycSessionRequest,
     ) -> Result<ProviderTransitReply, String> {
-        let (url_var, key_var) = match provider {
-            SharedKycProvider::Fyatu => ("FYATU_KYC_URL", "FYATU_API_KEY"),
-            SharedKycProvider::Kripicard => ("KRIPICARD_KYC_URL", "KRIPICARD_API_KEY"),
-            SharedKycProvider::Unspecified => {
-                return Err("shared kyc provider is required".to_string());
-            }
-        };
-        let url = std::env::var(url_var).map_err(|_| format!("{url_var} is not set"))?;
-        let api_key = std::env::var(key_var).map_err(|_| format!("{key_var} is not set"))?;
+        let url = std::env::var("CODEGO_KYC_API_BASE")
+            .unwrap_or_else(|_| "https://kyc-sandbox.codegotech.com".to_string());
+        let api_key = std::env::var("CODEGO_KYC_API_KEY")
+            .or_else(|_| std::env::var("CODEGO_API_KEY"))
+            .map_err(|_| "CODEGO_KYC_API_KEY or CODEGO_API_KEY is not set".to_string())?;
         let response = self
             .client
-            .post(url)
-            .header("Authorization", format!("Bearer {api_key}"))
+            .post(format!("{}/api/session/create", url.trim_end_matches('/')))
+            .header("X-Api-Key", api_key)
             .header("Content-Type", "application/json")
-            .body(passport_payload_json.to_owned())
+            .json(&payload)
             .send()
             .await
-            .map_err(|e| format!("shared kyc provider request failed: {e}"))?;
+            .map_err(|e| format!("codego kyc session request failed: {e}"))?;
         let status = response.status().as_u16() as u32;
         let body = response.text().await.unwrap_or_default();
+        let parsed = serde_json::from_str::<CodegoKycSessionCreateReply>(&body).ok();
         Ok(ProviderTransitReply {
-            accepted: (200..300).contains(&(status as u16)),
+            accepted: status == 201 || status == 200,
             provider_http_status: status,
             provider_response_body: body,
+            iframe_url: parsed
+                .as_ref()
+                .map(|reply| reply.iframe_url.clone())
+                .unwrap_or_default(),
+            session_id: parsed
+                .as_ref()
+                .map(|reply| reply.session_id.clone())
+                .unwrap_or_default(),
+            expires_at: parsed
+                .as_ref()
+                .map(|reply| reply.expires_at.clone())
+                .unwrap_or_default(),
         })
     }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CodegoKycSessionRequest {
+    external_user_id: String,
+    applicant_type: String,
+    email: String,
+    origin: String,
+    locale: String,
+    return_url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    resume_session_id: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CodegoKycSessionCreateReply {
+    session_id: String,
+    iframe_url: String,
+    expires_at: String,
 }
 
 struct ProviderTransitReply {
     accepted: bool,
     provider_http_status: u32,
     provider_response_body: String,
+    iframe_url: String,
+    session_id: String,
+    expires_at: String,
+}
+
+fn compose_external_user_id(user_key: &str, account_id: &[u8]) -> String {
+    format!("{}::{}", user_key, String::from_utf8_lossy(account_id))
+}
+
+fn normalized_applicant_type(value: &str) -> String {
+    if value.eq_ignore_ascii_case("company") {
+        "company".to_string()
+    } else {
+        "individual".to_string()
+    }
+}
+
+fn normalized_optional_string(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
 }
 
 fn debit_account(account: &AccountSlot, amount: i64) -> bool {
@@ -696,7 +758,9 @@ fn unix_ms_now() -> u128 {
 
 fn identity_key(value: &[u8], field_name: &str) -> Result<String, Status> {
     if value.is_empty() {
-        return Err(Status::invalid_argument(format!("{field_name} is required")));
+        return Err(Status::invalid_argument(format!(
+            "{field_name} is required"
+        )));
     }
     match std::str::from_utf8(value) {
         Ok(text) if !text.trim().is_empty() => Ok(text.trim().to_string()),

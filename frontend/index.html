@@ -3,32 +3,157 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Hyperion Mesh</title>
+  <title>Hyperion Mesh Card Flow</title>
   <link rel="manifest" href="/manifest.json" />
   <link rel="stylesheet" href="/style.css" />
-  <meta name="theme-color" content="#0a0a0a" />
+  <meta name="theme-color" content="#11342f" />
 </head>
 <body>
-  <main class="app">
-    <header>
-      <h1>Hyperion Mesh</h1>
-      <p class="status" id="status">Connecting…</p>
-    </header>
-
-    <section class="card">
-      <h2>Balance</h2>
-      <div class="balance" id="balance">0.00</div>
-      <div class="currency">Hyperion Coin</div>
+  <main class="page">
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Cloudflare Frontend · GCP Gateway</p>
+        <h1>Hyperion Shared KYC flow</h1>
+        <p class="lede">
+          Minimal operator-ready frontend for card authorization, the 100-transaction KYC threshold,
+          and hosted Codego KYC session opening through the backend.
+        </p>
+      </div>
+      <div class="hero-panel">
+        <div class="metric">
+          <span class="metric-label">KYC level</span>
+          <strong id="kyc-level">BASIC</strong>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Approved tx</span>
+          <strong id="tx-count">0</strong>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Threshold</span>
+          <strong>100</strong>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Gateway</span>
+          <strong id="gateway-status">ready</strong>
+        </div>
+      </div>
     </section>
 
-    <section class="actions">
-      <button id="btn-simulate" disabled>Simulate 10 EUR payment</button>
-      <button id="btn-deposit" disabled>Deposit +100 USDT</button>
+    <section class="grid">
+      <article class="panel">
+        <div class="panel-head">
+          <h2>Card Authorization</h2>
+          <span class="tag">/api/card/authorize</span>
+        </div>
+        <form id="auth-form" class="form">
+          <label>
+            User ID
+            <input id="auth-user-id" value="user-demo-0001" />
+          </label>
+          <label>
+            Account ID
+            <input id="auth-account-id" value="acct-demo-0001" />
+          </label>
+          <label>
+            Card ID
+            <input id="auth-card-id" value="card-demo-5544" />
+          </label>
+          <label>
+            Merchant ID
+            <input id="auth-merchant-id" value="merchant-coffee-lab" />
+          </label>
+          <div class="two-col">
+            <label>
+              Currency
+              <select id="auth-currency">
+                <option value="EUR">EUR</option>
+                <option value="USD">USD</option>
+              </select>
+            </label>
+            <label>
+              Amount minor
+              <input id="auth-amount-minor" type="number" min="1" value="1550" />
+            </label>
+          </div>
+          <button type="submit" class="primary">Authorize payment</button>
+        </form>
+      </article>
+
+      <article class="panel">
+        <div class="panel-head">
+          <h2>Codego KYC Session</h2>
+          <span class="tag">/api/codego/kyc/session</span>
+        </div>
+        <form id="kyc-form" class="form">
+          <label>
+            User ID
+            <input id="kyc-user-id" value="user-demo-0001" />
+          </label>
+          <label>
+            Account ID
+            <input id="kyc-account-id" value="acct-demo-0001" />
+          </label>
+          <label>
+            Email
+            <input id="kyc-email" type="email" value="rartiushkov@gmail.com" />
+          </label>
+          <label>
+            Origin
+            <input id="kyc-origin" value="https://hyperion-mesh-frontend.pages.dev" />
+          </label>
+          <label>
+            Return URL
+            <input id="kyc-return-url" value="https://hyperion-mesh-frontend.pages.dev/onboarding/done" />
+          </label>
+          <div class="two-col">
+            <label>
+              Locale
+              <input id="kyc-locale" value="en" />
+            </label>
+            <label>
+              Applicant type
+              <select id="kyc-applicant-type">
+                <option value="individual">individual</option>
+                <option value="company">company</option>
+              </select>
+            </label>
+          </div>
+          <button type="submit" class="secondary">Open Codego iframe</button>
+        </form>
+      </article>
     </section>
 
-    <section class="log">
-      <h2>Event log</h2>
-      <ul id="log"></ul>
+    <section class="grid secondary-grid">
+      <article class="panel widget-panel">
+        <div class="panel-head">
+          <h2>Provider Widget</h2>
+          <span class="tag">opens on REQUIRES_KYC_UPGRADE</span>
+        </div>
+        <div id="widget-placeholder" class="widget-placeholder">
+          Waiting for a KYC session or upgrade verdict.
+        </div>
+      </article>
+
+      <article class="panel env-panel">
+        <div class="panel-head">
+          <h2>Cloudflare Needs</h2>
+          <span class="tag">Pages + Worker</span>
+        </div>
+        <ul class="checklist">
+          <li>Deploy `frontend/dist` to Cloudflare Pages.</li>
+          <li>Set Worker variable `API_ORIGIN=https://YOUR_GCP_DOMAIN_OR_IP:8082`.</li>
+          <li>If the GCP box is plain HTTP first, set `API_SCHEME=http` in the Worker.</li>
+          <li>Keep Supabase and KYC provider keys only on GCP, never in Cloudflare frontend.</li>
+        </ul>
+      </article>
+    </section>
+
+    <section class="panel log-panel">
+      <div class="panel-head">
+        <h2>Flow Log</h2>
+        <span class="tag">operator view</span>
+      </div>
+      <ul id="log" class="log"></ul>
     </section>
   </main>
 

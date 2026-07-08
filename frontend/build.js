@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const files = ['index.html', 'app.js', 'style.css', 'manifest.json', 'service-worker.js'];
+const files = ['index.html', 'app.js', 'style.css', 'manifest.json', 'service-worker.js', '_worker.js', '_headers'];
 const dist = path.join(__dirname, 'dist');
 
 fs.mkdirSync(dist, { recursive: true });

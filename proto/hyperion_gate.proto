@@ -36,6 +36,7 @@ enum SharedKycProvider {
   SHARED_KYC_PROVIDER_UNSPECIFIED = 0;
   SHARED_KYC_PROVIDER_FYATU = 1;
   SHARED_KYC_PROVIDER_KRIPICARD = 2;
+  SHARED_KYC_PROVIDER_CODEGO = 3;
 }
 
 message KycApprovalRequest {
@@ -44,6 +45,7 @@ message KycApprovalRequest {
   VerificationVendor vendor = 3;
   bool approved = 4;
   uint64 event_unix_ms = 5;
+  string provider_user_id = 6;
 }
 
 message KycApprovalReply {
@@ -91,8 +93,13 @@ message SharedKycRequest {
   bytes account_id = 1;
   bytes user_id = 2;
   SharedKycProvider provider = 3;
-  string passport_payload_json = 4;
-  uint64 event_unix_ms = 5;
+  string email = 4;
+  string origin = 5;
+  string locale = 6;
+  string return_url = 7;
+  string applicant_type = 8;
+  string resume_session_id = 9;
+  uint64 event_unix_ms = 10;
 }
 
 message SharedKycReply {
@@ -102,4 +109,7 @@ message SharedKycReply {
   string kyc_level = 4;
   FrontendCommand frontend_command = 5;
   uint64 processed_at_unix_ms = 6;
+  string iframe_url = 7;
+  string session_id = 8;
+  string expires_at = 9;
 }

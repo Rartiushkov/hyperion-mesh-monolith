@@ -55,8 +55,16 @@ This starts:
 - `hyperion_grpc_server` on `:8080`
 - `hyperion_card_webhook` on `:8082`
 
-The Cloudflare frontend can call `/shared-kyc/process` and `/card/authorize`
+The Cloudflare frontend can call `/codego/kyc/session` and `/card/authorize`
 through the webhook layer, while the webhook talks locally to the gRPC server.
+Codego should post KYC outcomes back to `/codego/webhook`, which verifies the
+HMAC `Signature` header and upgrades the user's `kyc_level` in Supabase.
+
+## Remote Deploy From Windows
+
+If you want the same "run one script from the PC" flow used in `hft_arbitrage_core`,
+use `tools/remote_deploy_source.ps1`. It uploads a minimal
+source payload, builds Linux binaries on the server, and runs the binary deploy flow.
 
 ---
 

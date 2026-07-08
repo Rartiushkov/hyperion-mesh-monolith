@@ -15,6 +15,7 @@ pub struct SupabaseClient {
 pub struct UserKycState {
     pub tx_count: u64,
     pub kyc_level: String,
+    pub provider_user_id: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -23,12 +24,14 @@ struct UserUpsertPayload<'a> {
     kyc_status: &'a str,
     tx_count: i32,
     kyc_level: &'a str,
+    provider_user_id: Option<&'a str>,
 }
 
 #[derive(Serialize)]
 struct UserStatePatch<'a> {
     tx_count: Option<i32>,
     kyc_level: Option<&'a str>,
+    provider_user_id: Option<&'a str>,
 }
 
 impl SupabaseClient {
@@ -59,6 +62,7 @@ impl SupabaseClient {
             kyc_status: "approved",
             tx_count: 0,
             kyc_level: initial_kyc_level,
+            provider_user_id: None,
         }];
         let response = self
             .http
@@ -74,16 +78,21 @@ impl SupabaseClient {
         let status = response.status();
         if !status.is_success() {
             let body = response.text().await.unwrap_or_default();
-            return Err(format!("supabase ensure user failed: status={status} body={body}"));
+            return Err(format!(
+                "supabase ensure user failed: status={status} body={body}"
+            ));
         }
         Ok(())
     }
 
-    pub async fn fetch_user_kyc_state(&self, user_id: &str) -> Result<Option<UserKycState>, String> {
+    pub async fn fetch_user_kyc_state(
+        &self,
+        user_id: &str,
+    ) -> Result<Option<UserKycState>, String> {
         let mut url = reqwest::Url::parse(&format!("{}/users", self.rest_url))
             .map_err(|e| format!("supabase users url parse failed: {e}"))?;
         url.query_pairs_mut()
-            .append_pair("select", "tx_count,kyc_level")
+            .append_pair("select", "tx_count,kyc_level,provider_user_id")
             .append_pair("external_ref", &format!("eq.{user_id}"))
             .append_pair("limit", "1");
         let response = self
@@ -97,7 +106,9 @@ impl SupabaseClient {
         let status = response.status();
         if !status.is_success() {
             let body = response.text().await.unwrap_or_default();
-            return Err(format!("supabase fetch user failed: status={status} body={body}"));
+            return Err(format!(
+                "supabase fetch user failed: status={status} body={body}"
+            ));
         }
         let rows: Vec<UserKycStateRow> = response
             .json()
@@ -113,6 +124,7 @@ impl SupabaseClient {
             .unwrap_or(UserKycState {
                 tx_count: 0,
                 kyc_level: BASIC_KYC_LEVEL.to_string(),
+                provider_user_id: None,
             });
         let next_count = current.tx_count.saturating_add(1);
         self.patch_user_state(
@@ -120,12 +132,14 @@ impl SupabaseClient {
             UserStatePatch {
                 tx_count: Some(next_count as i32),
                 kyc_level: None,
+                provider_user_id: None,
             },
         )
         .await?;
         Ok(UserKycState {
             tx_count: next_count,
             kyc_level: current.kyc_level,
+            provider_user_id: current.provider_user_id,
         })
     }
 
@@ -139,6 +153,23 @@ impl SupabaseClient {
             UserStatePatch {
                 tx_count: None,
                 kyc_level: Some(kyc_level),
+                provider_user_id: None,
+            },
+        )
+        .await
+    }
+
+    pub async fn update_provider_user_id(
+        &self,
+        user_id: &str,
+        provider_user_id: &str,
+    ) -> Result<(), String> {
+        self.patch_user_state(
+            user_id,
+            UserStatePatch {
+                tx_count: None,
+                kyc_level: None,
+                provider_user_id: Some(provider_user_id),
             },
         )
         .await
@@ -167,7 +198,9 @@ impl SupabaseClient {
         let status = response.status();
         if !status.is_success() {
             let body = response.text().await.unwrap_or_default();
-            return Err(format!("supabase patch failed: status={status} body={body}"));
+            return Err(format!(
+                "supabase patch failed: status={status} body={body}"
+            ));
         }
         Ok(())
     }
@@ -177,6 +210,7 @@ impl SupabaseClient {
 struct UserKycStateRow {
     tx_count: Option<i32>,
     kyc_level: Option<String>,
+    provider_user_id: Option<String>,
 }
 
 impl From<UserKycStateRow> for UserKycState {
@@ -186,6 +220,7 @@ impl From<UserKycStateRow> for UserKycState {
             kyc_level: value
                 .kyc_level
                 .unwrap_or_else(|| BASIC_KYC_LEVEL.to_string()),
+            provider_user_id: value.provider_user_id,
         }
     }
 }

@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS users (
     kyc_status      VARCHAR(32) DEFAULT 'pending',  -- pending | approved | rejected
     tx_count        INT DEFAULT 0,
     kyc_level       TEXT DEFAULT 'BASIC',
+    provider_user_id VARCHAR(128),
     phone           VARCHAR(64),
     email           VARCHAR(256),
     external_ref    VARCHAR(128) UNIQUE,             -- Wallester/Airwallex customer id
@@ -23,6 +24,7 @@ CREATE INDEX IF NOT EXISTS idx_users_kyc_level ON users(kyc_level);
 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS tx_count INT DEFAULT 0;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_level TEXT DEFAULT 'BASIC';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS provider_user_id VARCHAR(128);
 
 -- Payment / card authorization history (WAL)
 CREATE TABLE IF NOT EXISTS payments (
