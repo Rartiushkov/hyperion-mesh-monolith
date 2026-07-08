@@ -10,11 +10,11 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $requiredFiles = @(
-    "hyperion_grpc_server",
-    "hyperion_card_webhook",
-    "deploy_binary.sh",
-    "hyperion-grpc.service",
-    "hyperion-card-webhook.service"
+    "target/release/hyperion_grpc_server",
+    "target/release/hyperion_card_webhook",
+    "deploy/deploy_binary.sh",
+    "deploy/hyperion-grpc.service",
+    "deploy/hyperion-card-webhook.service"
 )
 
 function Write-Log {
@@ -53,6 +53,7 @@ if ($LASTEXITCODE -ne 0) {
 
 $remoteDeploy = @'
 set -euo pipefail
+sudo systemctl stop hyperion-grpc.service hyperion-card-webhook.service || true
 sudo mkdir -p __REMOTE_DIR__/bin __REMOTE_DIR__/deploy __REMOTE_DIR__/traces
 sudo cp __STAGE_DIR__/hyperion_grpc_server __REMOTE_DIR__/bin/
 sudo cp __STAGE_DIR__/hyperion_card_webhook __REMOTE_DIR__/bin/
