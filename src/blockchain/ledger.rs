@@ -174,7 +174,7 @@ mod tests {
         };
         ledger.replace_avatars(vec![avatar_a.clone(), avatar_b, avatar_c.clone()]);
 
-        assert_eq!(ledger.route_via_optimal_avatar(), Some(avatar_a));
+        assert_eq!(ledger.route_via_optimal_avatar(), Some(avatar_a.clone()));
         assert_eq!(ledger.route_via_optimal_avatar(), Some(avatar_c));
         assert_eq!(ledger.route_via_optimal_avatar(), Some(avatar_a));
     }
