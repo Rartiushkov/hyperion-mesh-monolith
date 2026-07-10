@@ -34,11 +34,13 @@ sha3 = "0.10"
 hex = "0.4"
 core_affinity = "0.8"
 sysinfo = "0.30"
-rustls = { version = "0.23", features = ["ring"] }
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "blocking"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls-webpki-roots-no-provider", "blocking"] }
 tonic = { version = "0.12", features = ["transport"] }
 prost = "0.13"
 axum = "0.7"
+hmac = "0.12"
+uuid = { version = "1", features = ["v4", "serde"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_System_Threading"] }

@@ -1,11 +1,20 @@
 //! Lock-free RAMAN ledger for JIT-DEX swaps.
 
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::{Arc, RwLock};
+use uuid::Uuid;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SwapError {
     InvalidAccount,
     InsufficientBalance,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CodegotechAvatar {
+    pub avatar_id: Uuid,
+    pub api_key: String,
+    pub is_active: bool,
 }
 
 /// Minimal lock-free multi-currency ledger.
@@ -16,6 +25,8 @@ pub enum SwapError {
 pub struct RamanLedger {
     usdt: Vec<AtomicU64>,
     eurc: Vec<AtomicU64>,
+    avatars: Arc<RwLock<Vec<CodegotechAvatar>>>,
+    avatar_cursor: AtomicUsize,
 }
 
 impl RamanLedger {
@@ -29,7 +40,35 @@ impl RamanLedger {
             eurc: (0..accounts)
                 .map(|_| AtomicU64::new(initial_eurc_micro))
                 .collect(),
+            avatars: Arc::new(RwLock::new(Vec::new())),
+            avatar_cursor: AtomicUsize::new(0),
         }
+    }
+
+    pub fn avatars(&self) -> Arc<RwLock<Vec<CodegotechAvatar>>> {
+        self.avatars.clone()
+    }
+
+    pub fn replace_avatars(&self, avatars: Vec<CodegotechAvatar>) {
+        if let Ok(mut guard) = self.avatars.write() {
+            *guard = avatars;
+            self.avatar_cursor.store(0, Ordering::Release);
+        }
+    }
+
+    /// Round-robin rate-limit optimizer for Codegotech API calls.
+    pub fn route_via_optimal_avatar(&self) -> Option<CodegotechAvatar> {
+        let guard = self.avatars.read().ok()?;
+        if guard.is_empty() {
+            return None;
+        }
+        let active: Vec<&CodegotechAvatar> =
+            guard.iter().filter(|avatar| avatar.is_active).collect();
+        if active.is_empty() {
+            return None;
+        }
+        let idx = self.avatar_cursor.fetch_add(1, Ordering::AcqRel) % active.len();
+        Some(active[idx].clone())
     }
 
     /// Read a USDT balance.
@@ -68,7 +107,6 @@ impl RamanLedger {
 
         let eurc_amount = amount_usdt_micro.saturating_mul(fx_rate) / 1_000_000;
 
-        // Debit USDT from source (CAS loop).
         loop {
             let cur = src_usdt.load(Ordering::Relaxed);
             if cur < amount_usdt_micro {
@@ -87,7 +125,6 @@ impl RamanLedger {
             }
         }
 
-        // Credit EURC to destination (CAS loop).
         loop {
             let cur = dst_eurc.load(Ordering::Relaxed);
             if dst_eurc
@@ -115,5 +152,30 @@ mod tests {
         assert_eq!(got, 1_085_000);
         assert_eq!(ledger.usdt_balance(0).unwrap(), 999_999_000_000);
         assert_eq!(ledger.eurc_balance(1).unwrap(), 1_085_000);
+    }
+
+    #[test]
+    fn route_balances_only_active_avatars() {
+        let ledger = RamanLedger::new(2, 0, 0);
+        let avatar_a = CodegotechAvatar {
+            avatar_id: Uuid::new_v4(),
+            api_key: "a".to_string(),
+            is_active: true,
+        };
+        let avatar_b = CodegotechAvatar {
+            avatar_id: Uuid::new_v4(),
+            api_key: "b".to_string(),
+            is_active: false,
+        };
+        let avatar_c = CodegotechAvatar {
+            avatar_id: Uuid::new_v4(),
+            api_key: "c".to_string(),
+            is_active: true,
+        };
+        ledger.replace_avatars(vec![avatar_a.clone(), avatar_b, avatar_c.clone()]);
+
+        assert_eq!(ledger.route_via_optimal_avatar(), Some(avatar_a.clone()));
+        assert_eq!(ledger.route_via_optimal_avatar(), Some(avatar_c));
+        assert_eq!(ledger.route_via_optimal_avatar(), Some(avatar_a));
     }
 }

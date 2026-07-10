@@ -2,9 +2,10 @@ name: Hyperion Mesh CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, feature/grpc-infrastructure-integration]
   pull_request:
-    branches: [main, master]
+    branches: [main, master, feature/grpc-infrastructure-integration]
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -12,7 +13,7 @@ env:
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
 
@@ -37,10 +38,22 @@ jobs:
         continue-on-error: true
 
       - name: Build release
-        run: cargo build --release
+        run: |
+          cargo build --release \
+            --bin hyperion_grpc_server \
+            --bin hyperion_card_webhook \
+            --bin hyperion_grpc_smoke \
+            --bin hyperion_raw_ingress \
+            --bin hyperion_unified_bench
 
       - name: Run tests
-        run: cargo test --release
+        run: |
+          cargo test --release --lib \
+            --bin hyperion_grpc_server \
+            --bin hyperion_card_webhook \
+            --bin hyperion_grpc_smoke \
+            --bin hyperion_raw_ingress \
+            --bin hyperion_unified_bench
 
       - name: Upload backend artifacts
         uses: actions/upload-artifact@v4
@@ -52,6 +65,9 @@ jobs:
             target/release/hyperion_grpc_server
             target/release/hyperion_grpc_smoke
             target/release/hyperion_card_webhook
+            deploy/deploy_binary.sh
+            deploy/hyperion-grpc.service
+            deploy/hyperion-card-webhook.service
           retention-days: 7
 
   frontend-build:

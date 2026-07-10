@@ -3,32 +3,427 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Hyperion Mesh</title>
+  <title>Hyperion Client Cabinet</title>
   <link rel="manifest" href="/manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/style.css" />
-  <meta name="theme-color" content="#0a0a0a" />
+  <meta name="theme-color" content="#07101d" />
 </head>
 <body>
-  <main class="app">
-    <header>
-      <h1>Hyperion Mesh</h1>
-      <p class="status" id="status">Connecting…</p>
-    </header>
+  <main class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <p class="eyebrow">Hyperion Mesh</p>
+        <h1>Client Cabinet</h1>
+        <p class="brand-copy">Funding, identity, card issuing, and payment operations in one workspace.</p>
+      </div>
 
-    <section class="card">
-      <h2>Balance</h2>
-      <div class="balance" id="balance">0.00</div>
-      <div class="currency">Hyperion Coin</div>
-    </section>
+      <nav class="nav">
+        <a href="#overview" class="nav-link active">Overview</a>
+        <a href="#funding" class="nav-link">Funding</a>
+        <a href="#cards" class="nav-link">Cards</a>
+        <a href="#identity" class="nav-link">KYC</a>
+        <a href="#activity" class="nav-link">Activity</a>
+      </nav>
 
-    <section class="actions">
-      <button id="btn-simulate" disabled>Simulate 10 EUR payment</button>
-      <button id="btn-deposit" disabled>Deposit +100 USDT</button>
-    </section>
+      <section class="sidebar-panel">
+        <p class="panel-label">Runtime</p>
+        <div class="mini-metric">
+          <span>Gateway</span>
+          <strong id="gateway-status">ready</strong>
+        </div>
+        <div class="mini-metric">
+          <span>KYC</span>
+          <strong id="kyc-level">BASIC</strong>
+        </div>
+        <div class="mini-metric">
+          <span>Approved tx</span>
+          <strong id="tx-count">0</strong>
+        </div>
+        <div class="mini-metric">
+          <span>Rail</span>
+          <strong id="rail-status">SBP / CARD</strong>
+        </div>
+      </section>
 
-    <section class="log">
-      <h2>Event log</h2>
-      <ul id="log"></ul>
+      <section class="sidebar-panel">
+        <p class="panel-label">Live Contour</p>
+        <ul class="bullet-list">
+          <li>T-Bank acquiring for `SBP` and cards</li>
+          <li>Codego hosted KYC</li>
+          <li>Temporary internet credentials</li>
+          <li>Permanent card requests</li>
+        </ul>
+      </section>
+    </aside>
+
+    <section class="workspace">
+      <header id="overview" class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Render-inspired banking workspace</p>
+          <h2>A cleaner cabinet for top-ups, card issue, and KYC.</h2>
+          <p class="hero-text">
+            The cabinet is now grouped by real client tasks instead of backend endpoints.
+            First bring money in. Then issue a temporary or permanent card. If risk limits trigger,
+            open hosted KYC without leaving the workspace.
+          </p>
+          <div class="hero-actions">
+            <a href="#funding" class="button primary-link">Open funding</a>
+            <a href="#cards" class="button ghost-link">Go to cards</a>
+          </div>
+        </div>
+
+        <div class="hero-grid">
+          <article class="hero-card accent-mint">
+            <span class="hero-label">Funding rails</span>
+            <strong>SBP + cards</strong>
+            <p>T-Bank session creation with QR or hosted pay link.</p>
+          </article>
+          <article class="hero-card accent-cyan">
+            <span class="hero-label">Card layer</span>
+            <strong>Temporary + permanent</strong>
+            <p>Internet credentials for fast issue and a path to long-term cards.</p>
+          </article>
+          <article class="hero-card accent-violet">
+            <span class="hero-label">Identity</span>
+            <strong>Hosted KYC</strong>
+            <p>Codego iframe can open directly from the client workspace.</p>
+          </article>
+          <article class="hero-card accent-amber">
+            <span class="hero-label">Operations</span>
+            <strong>Live trace</strong>
+            <p>Activity log and response preview stay visible while flows run.</p>
+          </article>
+        </div>
+      </header>
+
+      <section id="funding" class="section-block">
+        <div class="section-head">
+          <div>
+            <p class="panel-label">Step 1</p>
+            <h3>Bring money in</h3>
+          </div>
+          <span class="tag">SBP / card acquiring</span>
+        </div>
+
+        <div class="content-grid two-main">
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="panel-label">Funding Session</p>
+                <h4>Create payment session</h4>
+              </div>
+              <span class="tag">/api/tbank/payments/init</span>
+            </div>
+            <form id="tbank-form" class="form">
+              <div class="three-col">
+                <label>
+                  Amount minor
+                  <input id="tbank-amount-minor" type="number" min="1" value="150000" />
+                </label>
+                <label>
+                  Rail
+                  <select id="tbank-payment-method">
+                    <option value="SBP">SBP</option>
+                    <option value="CARD">CARD</option>
+                  </select>
+                </label>
+                <label>
+                  Order ID
+                  <input id="tbank-order-id" value="order-demo-0001" />
+                </label>
+              </div>
+              <div class="two-col">
+                <label>
+                  Description
+                  <input id="tbank-description" value="Hyperion wallet top-up" />
+                </label>
+                <label>
+                  Customer key
+                  <input id="tbank-customer-key" value="customer-demo-0001" />
+                </label>
+              </div>
+              <button type="submit" class="button primary">Create payment session</button>
+            </form>
+          </article>
+
+          <article class="panel side-panel">
+            <div class="panel-head">
+              <div>
+                <p class="panel-label">What happens</p>
+                <h4>Funding flow</h4>
+              </div>
+            </div>
+            <ol class="ordered-list">
+              <li>Choose `SBP` or `CARD`.</li>
+              <li>Create a T-Bank session.</li>
+              <li>Open pay link or QR payload.</li>
+              <li>Move to card issuance after successful pay-in.</li>
+            </ol>
+          </article>
+        </div>
+      </section>
+
+      <section id="cards" class="section-block">
+        <div class="section-head">
+          <div>
+            <p class="panel-label">Step 2</p>
+            <h3>Issue and manage cards</h3>
+          </div>
+          <span class="tag">temporary / permanent</span>
+        </div>
+
+        <div class="content-grid">
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="panel-label">Internet Card</p>
+                <h4>Temporary credentials</h4>
+              </div>
+              <span class="tag">/api/internet/credentials</span>
+            </div>
+            <form id="internet-form" class="form">
+              <div class="two-col">
+                <label>
+                  User ID
+                  <input id="internet-user-id" value="user-demo-0001" />
+                </label>
+                <label>
+                  Account ID
+                  <input id="internet-account-id" value="acct-demo-0001" />
+                </label>
+              </div>
+              <div class="three-col">
+                <label>
+                  Amount minor
+                  <input id="internet-amount-minor" type="number" min="1" value="2500" />
+                </label>
+                <label>
+                  Currency
+                  <select id="internet-currency">
+                    <option value="EUR">EUR</option>
+                    <option value="USD">USD</option>
+                  </select>
+                </label>
+                <label>
+                  TTL seconds
+                  <input id="internet-ttl" type="number" min="30" max="120" value="120" />
+                </label>
+              </div>
+              <button type="submit" class="button secondary">Issue temporary card</button>
+            </form>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="panel-label">Permanent Card</p>
+                <h4>Long-term issue request</h4>
+              </div>
+              <span class="tag">/api/cards/permanent/request</span>
+            </div>
+            <form id="permanent-form" class="form">
+              <div class="two-col">
+                <label>
+                  User ID
+                  <input id="permanent-user-id" value="user-demo-0001" />
+                </label>
+                <label>
+                  Account ID
+                  <input id="permanent-account-id" value="acct-demo-0001" />
+                </label>
+              </div>
+              <label>
+                Cardholder name
+                <input id="permanent-name" value="R Artyshkov" />
+              </label>
+              <div class="two-col">
+                <label>
+                  Card type
+                  <select id="permanent-card-type">
+                    <option value="permanent">permanent</option>
+                    <option value="virtual">virtual</option>
+                  </select>
+                </label>
+                <label>
+                  Delivery
+                  <select id="permanent-delivery-mode">
+                    <option value="virtual">virtual</option>
+                    <option value="physical">physical</option>
+                  </select>
+                </label>
+              </div>
+              <button type="submit" class="button primary">Request permanent card</button>
+            </form>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="panel-label">Decisioning</p>
+                <h4>Authorization test</h4>
+              </div>
+              <span class="tag">/api/card/authorize</span>
+            </div>
+            <form id="auth-form" class="form">
+              <div class="two-col">
+                <label>
+                  User ID
+                  <input id="auth-user-id" value="user-demo-0001" />
+                </label>
+                <label>
+                  Account ID
+                  <input id="auth-account-id" value="acct-demo-0001" />
+                </label>
+              </div>
+              <label>
+                Card ID
+                <input id="auth-card-id" value="card-demo-5544" />
+              </label>
+              <div class="three-col">
+                <label>
+                  Merchant
+                  <input id="auth-merchant-id" value="merchant-coffee-lab" />
+                </label>
+                <label>
+                  Currency
+                  <select id="auth-currency">
+                    <option value="EUR">EUR</option>
+                    <option value="USD">USD</option>
+                  </select>
+                </label>
+                <label>
+                  Amount minor
+                  <input id="auth-amount-minor" type="number" min="1" value="1550" />
+                </label>
+              </div>
+              <button type="submit" class="button ghost">Run authorization</button>
+            </form>
+          </article>
+
+          <article class="panel preview-panel">
+            <div class="panel-head">
+              <div>
+                <p class="panel-label">Live Surface</p>
+                <h4>Preview responses</h4>
+              </div>
+              <span class="tag">runtime</span>
+            </div>
+            <div id="workspace-preview" class="workspace-preview">
+              Waiting for a payment session, iframe, or card response.
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="identity" class="section-block">
+        <div class="section-head">
+          <div>
+            <p class="panel-label">Step 3</p>
+            <h3>Upgrade identity when limits trigger</h3>
+          </div>
+          <span class="tag">hosted Codego KYC</span>
+        </div>
+
+        <div class="content-grid two-main">
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="panel-label">Hosted KYC</p>
+                <h4>Launch Codego session</h4>
+              </div>
+              <span class="tag">/api/codego/kyc/session</span>
+            </div>
+            <form id="kyc-form" class="form">
+              <div class="two-col">
+                <label>
+                  User ID
+                  <input id="kyc-user-id" value="user-demo-0001" />
+                </label>
+                <label>
+                  Account ID
+                  <input id="kyc-account-id" value="acct-demo-0001" />
+                </label>
+              </div>
+              <label>
+                Email
+                <input id="kyc-email" type="email" value="rartiushkov@gmail.com" />
+              </label>
+              <div class="two-col">
+                <label>
+                  Locale
+                  <input id="kyc-locale" value="en" />
+                </label>
+                <label>
+                  Applicant type
+                  <select id="kyc-applicant-type">
+                    <option value="individual">individual</option>
+                    <option value="company">company</option>
+                  </select>
+                </label>
+              </div>
+              <label>
+                Return URL
+                <input id="kyc-return-url" value="https://feature-grpc-infrastructure.hyperion-mesh-frontend.pages.dev/onboarding/done" />
+              </label>
+              <button type="submit" class="button primary">Launch KYC session</button>
+            </form>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="panel-label">Compliance Lab</p>
+                <h4>Transit-only KYC payload</h4>
+              </div>
+              <span class="tag">/api/shared-kyc/process</span>
+            </div>
+            <form id="shared-kyc-form" class="form">
+              <div class="two-col">
+                <label>
+                  User ID
+                  <input id="shared-user-id" value="user-demo-0001" />
+                </label>
+                <label>
+                  Account ID
+                  <input id="shared-account-id" value="acct-demo-0001" />
+                </label>
+              </div>
+              <label>
+                Email
+                <input id="shared-email" type="email" value="rartiushkov@gmail.com" />
+              </label>
+              <label>
+                Passport payload JSON
+                <textarea id="shared-passport-json">{ "passport": "1234 567890", "country": "BY" }</textarea>
+              </label>
+              <button type="submit" class="button ghost">Run transit-only KYC</button>
+            </form>
+          </article>
+        </div>
+      </section>
+
+      <section id="activity" class="section-block">
+        <div class="section-head">
+          <div>
+            <p class="panel-label">Step 4</p>
+            <h3>Track activity</h3>
+          </div>
+          <span class="tag">live trace</span>
+        </div>
+
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <p class="panel-label">Activity Feed</p>
+              <h4>Workspace log</h4>
+            </div>
+          </div>
+          <ul id="log" class="log"></ul>
+        </article>
+      </section>
     </section>
   </main>
 

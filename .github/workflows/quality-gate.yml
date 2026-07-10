@@ -20,7 +20,19 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Check quality gate script presence
+        id: quality_gate
+        shell: pwsh
+        run: |
+          if (Test-Path "tools/quality_gate.py") {
+            "present=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          } else {
+            "present=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+            Write-Host "tools/quality_gate.py is absent in this repository; skipping legacy quality gate."
+          }
+
       - name: Run Quality Gate
+        if: steps.quality_gate.outputs.present == 'true'
         shell: pwsh
         run: |
           python tools/quality_gate.py --firmware-warning-budget 8

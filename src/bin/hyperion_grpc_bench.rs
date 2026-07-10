@@ -149,6 +149,7 @@ async fn bootstrap_account(
             vendor: VerificationVendor::Sumsub as i32,
             approved: true,
             event_unix_ms: unix_ms_now() as u64,
+            provider_user_id: String::new(),
         }))
         .await?;
     client
