@@ -3,46 +3,132 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Hyperion Mesh Card Flow</title>
+  <title>Hyperion Control Plane</title>
   <link rel="manifest" href="/manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/style.css" />
-  <meta name="theme-color" content="#11342f" />
+  <meta name="theme-color" content="#0a1020" />
 </head>
 <body>
-  <main class="page">
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand-block">
+        <p class="eyebrow">Hyperion Mesh</p>
+        <h1>Client Banking Control Plane</h1>
+      </div>
+      <div class="topbar-actions">
+        <span class="status-pill live">Pages + GCP live</span>
+        <span class="status-pill outline">Cards + SBP + KYC</span>
+      </div>
+    </header>
+
     <section class="hero">
       <div class="hero-copy">
-        <p class="eyebrow">Cloudflare Frontend · GCP Gateway</p>
-        <h1>Hyperion Shared KYC flow</h1>
-        <p class="lede">
-          Minimal operator-ready frontend for card authorization, the 100-transaction KYC threshold,
-          and hosted Codego KYC session opening through the backend.
+        <p class="hero-label">Render-inspired operating surface</p>
+        <h2>One cabinet for pay-ins, KYC, internet cards, and permanent issuance.</h2>
+        <p class="hero-text">
+          The frontend now acts like a real client workspace: top up through SBP or cards,
+          check authorization state, launch hosted KYC, issue temporary internet credentials,
+          and request a permanent card without leaving the dashboard.
         </p>
+        <div class="hero-actions">
+          <a href="#funding" class="button primary-link">Start funding flow</a>
+          <a href="#identity" class="button ghost-link">Open KYC workspace</a>
+        </div>
       </div>
-      <div class="hero-panel">
-        <div class="metric">
-          <span class="metric-label">KYC level</span>
+
+      <div class="hero-metrics">
+        <article class="metric-card">
+          <span class="metric-label">KYC Level</span>
           <strong id="kyc-level">BASIC</strong>
-        </div>
-        <div class="metric">
-          <span class="metric-label">Approved tx</span>
+          <small>Shared state from gateway</small>
+        </article>
+        <article class="metric-card">
+          <span class="metric-label">Approved Tx</span>
           <strong id="tx-count">0</strong>
-        </div>
-        <div class="metric">
-          <span class="metric-label">Threshold</span>
-          <strong>100</strong>
-        </div>
-        <div class="metric">
+          <small>Threshold aware</small>
+        </article>
+        <article class="metric-card">
           <span class="metric-label">Gateway</span>
           <strong id="gateway-status">ready</strong>
-        </div>
+          <small>Pages worker proxy</small>
+        </article>
+        <article class="metric-card">
+          <span class="metric-label">Funding Rail</span>
+          <strong id="rail-status">SBP / CARD</strong>
+          <small>T-Bank contour</small>
+        </article>
       </div>
     </section>
 
-    <section class="grid">
+    <section class="summary-grid">
+      <article class="summary-panel">
+        <p class="summary-kicker">Flow stack</p>
+        <h3>Russia card or SBP in, KYC if needed, cards out.</h3>
+        <p>
+          This cabinet is built around the flows we already wired on the backend:
+          `T-Bank acquiring`, `Codego KYC`, `internet credentials`, and `permanent card issue`.
+        </p>
+      </article>
+      <article class="summary-panel">
+        <p class="summary-kicker">Operator mode</p>
+        <h3>Still usable as an internal operations cockpit.</h3>
+        <p>
+          The lower compliance lab keeps raw transit tools for hosted KYC and JSON-based escalation
+          without polluting the main client experience.
+        </p>
+      </article>
+    </section>
+
+    <section id="funding" class="workspace-grid">
+      <article class="panel span-two">
+        <div class="panel-head">
+          <div>
+            <p class="panel-kicker">Funding</p>
+            <h3>Top up via SBP or card</h3>
+          </div>
+          <span class="tag">/api/tbank/payments/init</span>
+        </div>
+        <form id="tbank-form" class="form">
+          <div class="three-col">
+            <label>
+              Amount minor
+              <input id="tbank-amount-minor" type="number" min="1" value="150000" />
+            </label>
+            <label>
+              Rail
+              <select id="tbank-payment-method">
+                <option value="SBP">SBP</option>
+                <option value="CARD">CARD</option>
+              </select>
+            </label>
+            <label>
+              Order ID
+              <input id="tbank-order-id" value="order-demo-0001" />
+            </label>
+          </div>
+          <div class="two-col">
+            <label>
+              Description
+              <input id="tbank-description" value="Hyperion wallet top-up" />
+            </label>
+            <label>
+              Customer key
+              <input id="tbank-customer-key" value="customer-demo-0001" />
+            </label>
+          </div>
+          <button type="submit" class="button primary">Create payment session</button>
+        </form>
+      </article>
+
       <article class="panel">
         <div class="panel-head">
-          <h2>Card Authorization</h2>
+          <div>
+            <p class="panel-kicker">Authorization</p>
+            <h3>Test card decisioning</h3>
+          </div>
           <span class="tag">/api/card/authorize</span>
         </div>
         <form id="auth-form" class="form">
@@ -58,10 +144,6 @@
             Card ID
             <input id="auth-card-id" value="card-demo-5544" />
           </label>
-          <label>
-            Merchant ID
-            <input id="auth-merchant-id" value="merchant-coffee-lab" />
-          </label>
           <div class="two-col">
             <label>
               Currency
@@ -75,13 +157,22 @@
               <input id="auth-amount-minor" type="number" min="1" value="1550" />
             </label>
           </div>
-          <button type="submit" class="primary">Authorize payment</button>
+          <label>
+            Merchant ID
+            <input id="auth-merchant-id" value="merchant-coffee-lab" />
+          </label>
+          <button type="submit" class="button secondary">Run authorization</button>
         </form>
       </article>
+    </section>
 
+    <section id="identity" class="workspace-grid">
       <article class="panel">
         <div class="panel-head">
-          <h2>Codego KYC Session</h2>
+          <div>
+            <p class="panel-kicker">Identity</p>
+            <h3>Open hosted Codego KYC</h3>
+          </div>
           <span class="tag">/api/codego/kyc/session</span>
         </div>
         <form id="kyc-form" class="form">
@@ -97,14 +188,6 @@
             Email
             <input id="kyc-email" type="email" value="rartiushkov@gmail.com" />
           </label>
-          <label>
-            Origin
-            <input id="kyc-origin" value="https://hyperion-mesh-frontend.pages.dev" />
-          </label>
-          <label>
-            Return URL
-            <input id="kyc-return-url" value="https://hyperion-mesh-frontend.pages.dev/onboarding/done" />
-          </label>
           <div class="two-col">
             <label>
               Locale
@@ -118,15 +201,116 @@
               </select>
             </label>
           </div>
-          <button type="submit" class="secondary">Open Codego iframe</button>
+          <label>
+            Return URL
+            <input id="kyc-return-url" value="https://feature-grpc-infrastructure.hyperion-mesh-frontend.pages.dev/onboarding/done" />
+          </label>
+          <button type="submit" class="button primary">Launch KYC session</button>
+        </form>
+      </article>
+
+      <article class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="panel-kicker">Internet Card</p>
+            <h3>Generate temporary credentials</h3>
+          </div>
+          <span class="tag">/api/internet/credentials</span>
+        </div>
+        <form id="internet-form" class="form">
+          <label>
+            User ID
+            <input id="internet-user-id" value="user-demo-0001" />
+          </label>
+          <label>
+            Account ID
+            <input id="internet-account-id" value="acct-demo-0001" />
+          </label>
+          <div class="three-col">
+            <label>
+              Amount minor
+              <input id="internet-amount-minor" type="number" min="1" value="2500" />
+            </label>
+            <label>
+              Currency
+              <select id="internet-currency">
+                <option value="EUR">EUR</option>
+                <option value="USD">USD</option>
+              </select>
+            </label>
+            <label>
+              TTL seconds
+              <input id="internet-ttl" type="number" min="30" max="120" value="120" />
+            </label>
+          </div>
+          <button type="submit" class="button secondary">Issue internet credentials</button>
         </form>
       </article>
     </section>
 
-    <section class="grid">
+    <section class="workspace-grid">
       <article class="panel">
         <div class="panel-head">
-          <h2>Shared KYC Transit</h2>
+          <div>
+            <p class="panel-kicker">Permanent Card</p>
+            <h3>Request long-term issue</h3>
+          </div>
+          <span class="tag">/api/cards/permanent/request</span>
+        </div>
+        <form id="permanent-form" class="form">
+          <label>
+            User ID
+            <input id="permanent-user-id" value="user-demo-0001" />
+          </label>
+          <label>
+            Account ID
+            <input id="permanent-account-id" value="acct-demo-0001" />
+          </label>
+          <label>
+            Cardholder name
+            <input id="permanent-name" value="R Artyshkov" />
+          </label>
+          <div class="two-col">
+            <label>
+              Card type
+              <select id="permanent-card-type">
+                <option value="permanent">permanent</option>
+                <option value="virtual">virtual</option>
+              </select>
+            </label>
+            <label>
+              Delivery
+              <select id="permanent-delivery-mode">
+                <option value="virtual">virtual</option>
+                <option value="physical">physical</option>
+              </select>
+            </label>
+          </div>
+          <button type="submit" class="button primary">Request permanent card</button>
+        </form>
+      </article>
+
+      <article class="panel preview-panel">
+        <div class="panel-head">
+          <div>
+            <p class="panel-kicker">Live Output</p>
+            <h3>Rail preview, QR, iframe, and provider responses</h3>
+          </div>
+          <span class="tag">runtime surface</span>
+        </div>
+        <div id="workspace-preview" class="workspace-preview">
+          Waiting for a payment session, KYC iframe, or card response.
+        </div>
+      </article>
+    </section>
+
+    <section class="workspace-grid compliance-grid">
+      <article class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="panel-kicker">Compliance Lab</p>
+            <h3>Transit raw KYC payload to Codego</h3>
+          </div>
           <span class="tag">/api/shared-kyc/process</span>
         </div>
         <form id="shared-kyc-form" class="form">
@@ -143,67 +327,23 @@
             <input id="shared-email" type="email" value="rartiushkov@gmail.com" />
           </label>
           <label>
-            Origin
-            <input id="shared-origin" value="https://hyperion-mesh-frontend.pages.dev" />
-          </label>
-          <label>
-            Return URL
-            <input id="shared-return-url" value="https://hyperion-mesh-frontend.pages.dev/kyc/completed" />
-          </label>
-          <label>
             Passport payload JSON
             <textarea id="shared-passport-json">{ "passport": "1234 567890", "country": "BY" }</textarea>
           </label>
-          <button type="submit" class="primary">Transit passport JSON to Codego</button>
+          <button type="submit" class="button ghost">Run transit-only KYC</button>
         </form>
       </article>
 
-      <article class="panel env-panel">
+      <article class="panel log-panel">
         <div class="panel-head">
-          <h2>Production Checklist</h2>
-          <span class="tag">GCP + Cloudflare</span>
+          <div>
+            <p class="panel-kicker">Activity</p>
+            <h3>Live control-plane log</h3>
+          </div>
+          <span class="tag">operator trace</span>
         </div>
-        <ul class="checklist">
-          <li>Cloudflare Pages Worker vars: `CIS_API_ORIGIN=35.226.240.198:8082` and `INTERNATIONAL_API_ORIGIN=35.226.240.198:8083`.</li>
-          <li>Keep `SUPABASE_SERVICE_ROLE_KEY`, `CODEGO_API_KEY`, `CODEGO_KYC_API_KEY` and `CODEGO_WEBHOOK_SECRET` only in `/opt/hyperion-mesh/.env`.</li>
-          <li>For production, move GCP ingress behind HTTPS domain and point Cloudflare there instead of raw IP.</li>
-          <li>Wire Codego webhook to `/codego/webhook` and set the matching `CODEGO_WEBHOOK_SECRET` on GCP.</li>
-          <li>Hosted KYC iframe is already live; frontend only needs to display `iframe_url` and wait for webhook completion.</li>
-        </ul>
+        <ul id="log" class="log"></ul>
       </article>
-    </section>
-
-    <section class="grid secondary-grid">
-      <article class="panel widget-panel">
-        <div class="panel-head">
-          <h2>Provider Widget</h2>
-          <span class="tag">opens on REQUIRES_KYC_UPGRADE</span>
-        </div>
-        <div id="widget-placeholder" class="widget-placeholder">
-          Waiting for a KYC session or upgrade verdict.
-        </div>
-      </article>
-
-      <article class="panel env-panel">
-        <div class="panel-head">
-          <h2>Operator Notes</h2>
-          <span class="tag">Pages + Worker</span>
-        </div>
-        <ul class="checklist">
-          <li>`Declined` on `/card/authorize` is now application logic, not infra failure.</li>
-          <li>`OpenCardProviderWidget` should trigger the hosted iframe block above.</li>
-          <li>`/shared-kyc/process` is transit-only: payload goes to Codego and must not be stored in Supabase.</li>
-          <li>Apple Wallet and internet credentials routes are ready on `8083` for the next frontend step.</li>
-        </ul>
-      </article>
-    </section>
-
-    <section class="panel log-panel">
-      <div class="panel-head">
-        <h2>Flow Log</h2>
-        <span class="tag">operator view</span>
-      </div>
-      <ul id="log" class="log"></ul>
     </section>
   </main>
 
