@@ -13,6 +13,136 @@
 | Web3 RPC (DEX) | Alchemy | $0 Free Tier | `ALCHEMY_RPC_URL` in `.env` |
 | WAL / Analytics | Supabase | $0 (500 MB) | `infra/migrations/001_init.sql` |
 
+## Current Deployment State (2026-07-08)
+
+What is already working:
+
+- GCP backend host is live at `35.226.240.198`
+- `hyperion_grpc_server` is running on `:8080`
+- `hyperion_card_webhook` is running on both `:8082` and `:8083`
+- Supabase schema was migrated to the reduced legal contour:
+  - `users(id, address_l2, tx_count, kyc_level)`
+  - `transactions(...)`
+- Card authorization smoke on `:8083` returns live JSON from the application
+- Codego sandbox KYC session creation works end-to-end and returns:
+  - `accepted=true`
+  - `session_id`
+  - `iframe_url`
+  - `expires_at`
+- The webhook layer now also exposes acquiring-facing server routes for:
+  - T-Bank payment session init for ordinary card checkout via hosted form
+  - T-Bank SBP QR generation off the same payment-init contour
+  - T-Bank payment-state polling
+  - T-Bank card binding init/status for future saved-card flows
+  - provider-side temporary internet credentials with TTL capped at `120` seconds
+  - provider-side permanent card request passthrough
+- Cloudflare Pages frontend was rebuilt and deployed:
+  - deployment URL: `https://af50be54.hyperion-mesh-frontend.pages.dev`
+  - preview alias: `https://feature-grpc-infrastructure.hyperion-mesh-frontend.pages.dev`
+
+What was changed in the frontend:
+
+- `frontend/_worker.js` now routes:
+  - `/api/aaio/webhook` -> backend `:8082`
+  - all other `/api/*` -> backend `:8083`
+- `frontend/index.html` and `frontend/app.js` now expose:
+  - card authorization flow
+  - Codego hosted KYC session flow
+  - transit-only Shared KYC form with `passport_payload_json`
+- Cloudflare Pages secrets were set for both `production` and `preview`:
+  - `CIS_API_ORIGIN=35.226.240.198:8082`
+  - `INTERNATIONAL_API_ORIGIN=35.226.240.198:8083`
+  - `API_SCHEME=http`
+
+Current blocker:
+
+- Cloudflare Worker proxying to a raw backend IP currently fails with `error code: 1003`
+- the Pages site itself is live, but `/api/*` through Pages is not fully usable until backend routing moves from raw IP to a hostname
+
+## No-Domain Options
+
+If there is still no domain in Cloudflare, these are the practical options:
+
+1. Keep using the frontend directly and call the GCP backend from the browser by explicit URL.
+   - Fastest operator contour
+   - Requires opening GCP firewall / handling CORS carefully
+   - Not ideal for production
+
+2. Use Cloudflare Pages only as static hosting, but do not proxy `/api/*` through the Worker yet.
+   - Frontend can show buttons / forms
+   - API requests can temporarily target `http://35.226.240.198:8083` directly during testing
+   - Best for short sandbox debugging
+
+3. Put a hostname in front of GCP without buying a full product domain first.
+   - Example: any domain/subdomain you control and can point at GCP
+   - Best path for proper Cloudflare Worker proxying
+
+4. Skip Cloudflare API proxying for now and stay on direct backend smoke commands.
+   - Already proven working:
+     - `:8082 /aaio/webhook`
+     - `:8083 /card/authorize`
+     - `:8083 /codego/kyc/session`
+
+Recommended next step:
+
+- add one real domain or subdomain to Cloudflare
+- create a DNS record pointing to `35.226.240.198`
+- switch Worker vars from raw IP usage to the hostname
+- rerun Pages smoke through `/api/card/authorize` and `/api/codego/kyc/session`
+
+## Payment Server Surface
+
+The backend can now act as the first server contour for mixed payment intake:
+
+- ordinary bank cards through T-Bank internet acquiring hosted checkout
+- SBP through T-Bank QR/session generation
+- T-Bank payment status callbacks through `NotificationURL`
+- temporary provider-issued internet credentials for short-lived card details
+- permanent-card request passthrough to the issuing provider
+
+Important boundary:
+
+- raw PAN/CVV entry should stay on the T-Bank hosted payment surface or another PCI-capable provider surface
+- this monolith should orchestrate sessions, statuses, KYC, and provider passthroughs, not become a PCI card vault
+- sensitive server routes on `:8083` should be protected by `HYPERION_OPERATOR_API_TOKEN`
+- approval signatures must come from `HYPERION_SIGNING_KEY`, never from a hardcoded key in the binary
+
+Main HTTP routes on `:8083`:
+
+- `POST /tbank/payments/init`
+- `POST /tbank/payments/state`
+- `POST /tbank/notifications`
+- `POST /tbank/cards/add`
+- `POST /tbank/cards/add/state`
+- `POST /internet/credentials`
+- `POST /cards/permanent/request`
+
+Required env:
+
+- `TBANK_EACQ_TERMINAL_KEY`
+- `TBANK_EACQ_PASSWORD`
+- `TBANK_EACQ_BASE_URL`
+- `TBANK_EACQ_MOCK_MODE`
+- `CODEGO_API_KEY`
+- `CODEGO_PERMANENT_CARD_PATH`
+- `HYPERION_INTERNET_CARD_TTL_SECONDS`
+- `HYPERION_OPERATOR_API_TOKEN`
+- `HYPERION_SIGNING_KEY`
+
+T-Bank acceptance flow:
+
+- backend calls `POST /tbank/payments/init` with `Amount`, `OrderId`, optional `NotificationURL`, and returns `PaymentURL` for card checkout
+- for SBP, the same init route can request QR data and returns `qr_data`
+- T-Bank then calls `POST /tbank/notifications`
+- the webhook verifies the notification token and returns plain `OK` with HTTP `200`, matching the T-Bank contract
+
+Local/mock testing mode:
+
+- set `TBANK_EACQ_MOCK_MODE=true`
+- no live `TerminalKey` or `Password` is required for `Init`, `GetQr`, `GetState`, `AddCard`, and `GetAddCardState`
+- `/tbank/notifications` also accepts mock payloads in this mode
+- this is the fastest way to test the full orchestration idea before real T-Bank sandbox credentials are available
+
 ## Quick Start on a New Machine
 
 ```bash

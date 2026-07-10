@@ -12,7 +12,6 @@ use tonic::{transport::Server, Request, Response, Status};
 
 const ACCOUNT_SLOT_COUNT: usize = 16_384;
 const INITIAL_ACCOUNT_BALANCE_MICRO_USDT: i64 = 0;
-const PRIVATE_KEY_HEX: &str = "4c0883a69102937d6231471b5dbb6204fe512961708279f0f95b9f8d0d4c1f7a";
 const CARD_FEE_BPS: i64 = 30;
 const DEFAULT_EUR_USDT: f64 = 1.0850;
 const DEFAULT_USD_USDT: f64 = 1.0000;
@@ -594,7 +593,9 @@ struct SignaturePool {
 impl SignaturePool {
     fn new(size: usize) -> Result<Self, String> {
         let secp = Secp256k1::signing_only();
-        let sk_bytes = hex_decode(PRIVATE_KEY_HEX)?;
+        let sk_hex = std::env::var("HYPERION_SIGNING_KEY")
+            .map_err(|_| "HYPERION_SIGNING_KEY is not set".to_string())?;
+        let sk_bytes = hex_decode(&sk_hex)?;
         let secret_key =
             SecretKey::from_slice(&sk_bytes).map_err(|e| format!("secret key parse: {e}"))?;
         let mut signatures = Vec::with_capacity(size);

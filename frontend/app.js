@@ -2,6 +2,7 @@ const els = {
   log: document.getElementById("log"),
   authForm: document.getElementById("auth-form"),
   kycForm: document.getElementById("kyc-form"),
+  sharedKycForm: document.getElementById("shared-kyc-form"),
   txCount: document.getElementById("tx-count"),
   kycLevel: document.getElementById("kyc-level"),
   gatewayStatus: document.getElementById("gateway-status"),
@@ -133,6 +134,43 @@ els.kycForm.addEventListener("submit", async (event) => {
     }
   } catch (error) {
     writeLog(`Codego KYC session failed: ${error.message}`, "error");
+  }
+});
+
+els.sharedKycForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const rawPassportPayload = document.getElementById("shared-passport-json").value.trim();
+  let passportPayloadJson = rawPassportPayload;
+
+  try {
+    passportPayloadJson = JSON.stringify(JSON.parse(rawPassportPayload));
+  } catch (error) {
+    writeLog(`Passport payload JSON is invalid: ${error.message}`, "error");
+    return;
+  }
+
+  const payload = {
+    user_id: document.getElementById("shared-user-id").value.trim(),
+    account_id: document.getElementById("shared-account-id").value.trim(),
+    email: document.getElementById("shared-email").value.trim(),
+    origin: document.getElementById("shared-origin").value.trim(),
+    return_url: document.getElementById("shared-return-url").value.trim(),
+    passport_payload_json: passportPayloadJson,
+  };
+
+  try {
+    const data = await postJson("/api/shared-kyc/process", payload);
+    updateState(data);
+    writeLog(
+      `Shared KYC transit accepted=${data.accepted} provider_status=${data.provider_http_status}`,
+      data.accepted ? "success" : "warn",
+    );
+    if (data.iframe_url) {
+      renderCodegoIframe(data);
+      writeLog("Transit flow returned a hosted continuation iframe.", "success");
+    }
+  } catch (error) {
+    writeLog(`Shared KYC transit failed: ${error.message}`, "error");
   }
 });
 

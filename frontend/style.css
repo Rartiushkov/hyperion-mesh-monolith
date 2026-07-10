@@ -182,6 +182,7 @@ textarea {
   min-height: 210px;
   font-family: Consolas, "Courier New", monospace;
   font-size: 0.88rem;
+  line-height: 1.5;
 }
 
 .two-col {
@@ -240,7 +241,8 @@ button.small {
 .widget-live {
   display: grid;
   gap: 12px;
-  max-width: 36ch;
+  width: 100%;
+  max-width: 100%;
 }
 
 .widget-live p {

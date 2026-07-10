@@ -123,6 +123,56 @@
       </article>
     </section>
 
+    <section class="grid">
+      <article class="panel">
+        <div class="panel-head">
+          <h2>Shared KYC Transit</h2>
+          <span class="tag">/api/shared-kyc/process</span>
+        </div>
+        <form id="shared-kyc-form" class="form">
+          <label>
+            User ID
+            <input id="shared-user-id" value="user-demo-0001" />
+          </label>
+          <label>
+            Account ID
+            <input id="shared-account-id" value="acct-demo-0001" />
+          </label>
+          <label>
+            Email
+            <input id="shared-email" type="email" value="rartiushkov@gmail.com" />
+          </label>
+          <label>
+            Origin
+            <input id="shared-origin" value="https://hyperion-mesh-frontend.pages.dev" />
+          </label>
+          <label>
+            Return URL
+            <input id="shared-return-url" value="https://hyperion-mesh-frontend.pages.dev/kyc/completed" />
+          </label>
+          <label>
+            Passport payload JSON
+            <textarea id="shared-passport-json">{ "passport": "1234 567890", "country": "BY" }</textarea>
+          </label>
+          <button type="submit" class="primary">Transit passport JSON to Codego</button>
+        </form>
+      </article>
+
+      <article class="panel env-panel">
+        <div class="panel-head">
+          <h2>Production Checklist</h2>
+          <span class="tag">GCP + Cloudflare</span>
+        </div>
+        <ul class="checklist">
+          <li>Cloudflare Pages Worker vars: `CIS_API_ORIGIN=35.226.240.198:8082` and `INTERNATIONAL_API_ORIGIN=35.226.240.198:8083`.</li>
+          <li>Keep `SUPABASE_SERVICE_ROLE_KEY`, `CODEGO_API_KEY`, `CODEGO_KYC_API_KEY` and `CODEGO_WEBHOOK_SECRET` only in `/opt/hyperion-mesh/.env`.</li>
+          <li>For production, move GCP ingress behind HTTPS domain and point Cloudflare there instead of raw IP.</li>
+          <li>Wire Codego webhook to `/codego/webhook` and set the matching `CODEGO_WEBHOOK_SECRET` on GCP.</li>
+          <li>Hosted KYC iframe is already live; frontend only needs to display `iframe_url` and wait for webhook completion.</li>
+        </ul>
+      </article>
+    </section>
+
     <section class="grid secondary-grid">
       <article class="panel widget-panel">
         <div class="panel-head">
@@ -136,14 +186,14 @@
 
       <article class="panel env-panel">
         <div class="panel-head">
-          <h2>Cloudflare Needs</h2>
+          <h2>Operator Notes</h2>
           <span class="tag">Pages + Worker</span>
         </div>
         <ul class="checklist">
-          <li>Deploy `frontend/dist` to Cloudflare Pages.</li>
-          <li>Set Worker variable `API_ORIGIN=https://YOUR_GCP_DOMAIN_OR_IP:8082`.</li>
-          <li>If the GCP box is plain HTTP first, set `API_SCHEME=http` in the Worker.</li>
-          <li>Keep Supabase and KYC provider keys only on GCP, never in Cloudflare frontend.</li>
+          <li>`Declined` on `/card/authorize` is now application logic, not infra failure.</li>
+          <li>`OpenCardProviderWidget` should trigger the hosted iframe block above.</li>
+          <li>`/shared-kyc/process` is transit-only: payload goes to Codego and must not be stored in Supabase.</li>
+          <li>Apple Wallet and internet credentials routes are ready on `8083` for the next frontend step.</li>
         </ul>
       </article>
     </section>
