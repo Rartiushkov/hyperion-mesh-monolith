@@ -1,0 +1,65 @@
+name: Deploy Pages Frontend
+
+on:
+  push:
+    branches:
+      - main
+      - feature/**
+  workflow_dispatch:
+
+concurrency:
+  group: pages-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+    env:
+      CLOUDFLARE_ACCOUNT_ID: fc22c21f68493e5cb86b169b7aa57ea3
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ensure Cloudflare token is configured
+        shell: bash
+        run: |
+          if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ]; then
+            echo "Missing GitHub secret CLOUDFLARE_API_TOKEN."
+            echo "Add a Cloudflare Pages Edit token in repository settings before rerunning."
+            exit 1
+          fi
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Deploy production Pages branch
+        if: github.ref_name == 'main'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+          command: pages deploy frontend/dist --project-name=hyperion-mesh-frontend --branch=main --commit-hash=${{ github.sha }}
+
+      - name: Deploy preview Pages branch
+        if: github.ref_name != 'main'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+          command: pages deploy frontend/dist --project-name=hyperion-mesh-frontend --branch=${{ github.ref_name }} --commit-hash=${{ github.sha }}
