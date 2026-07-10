@@ -21,7 +21,7 @@ function normalizeOrigin(origin, scheme) {
 function resolveRoute(url, env) {
   const scheme = env.API_SCHEME || "http";
   const publicOrigin = normalizeOrigin(
-    env.PUBLIC_API_ORIGIN || "35.226.240.198.sslip.io",
+    env.PUBLIC_API_ORIGIN || "housing-contribution-gonna-tuesday.trycloudflare.com",
     scheme,
   );
 
@@ -44,7 +44,10 @@ function resolveRoute(url, env) {
 
 function upstreamOrigin(env) {
   const scheme = env.API_SCHEME || "http";
-  const origin = env.PUBLIC_API_ORIGIN || env.API_ORIGIN || "35.226.240.198.sslip.io";
+  const origin =
+    env.PUBLIC_API_ORIGIN ||
+    env.API_ORIGIN ||
+    "housing-contribution-gonna-tuesday.trycloudflare.com";
   if (!origin) {
     return "";
   }

@@ -4,7 +4,7 @@ pages_build_output_dir = "dist"
 
 # Cloudflare Pages: deploy the static dist/ directory
 # Required variables:
-#   PUBLIC_API_ORIGIN=YOUR_GCP_DOMAIN_OR_SSLIP_HOST
+#   PUBLIC_API_ORIGIN=YOUR_GCP_DOMAIN_OR_TUNNEL_HOST
 # Optional:
 #   API_SCHEME=http
 # Run:
