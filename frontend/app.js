@@ -38,12 +38,12 @@ function setRailStatus(text) {
   els.railStatus.textContent = text;
 }
 
-function renderPreview(html) {
-  els.workspacePreview.innerHTML = html;
-}
-
 function prettyJson(value) {
   return JSON.stringify(value, null, 2);
+}
+
+function renderPreview(html) {
+  els.workspacePreview.innerHTML = html;
 }
 
 function renderPaymentPreview(data) {
@@ -136,6 +136,52 @@ els.tbankForm.addEventListener("submit", async (event) => {
   }
 });
 
+els.internetForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const payload = {
+    user_id: document.getElementById("internet-user-id").value.trim(),
+    account_id: document.getElementById("internet-account-id").value.trim(),
+    amount_minor: Number(document.getElementById("internet-amount-minor").value),
+    currency: document.getElementById("internet-currency").value,
+    ttl_seconds: Number(document.getElementById("internet-ttl").value),
+  };
+
+  try {
+    const data = await postJson("/api/internet/credentials", payload);
+    renderProviderPreview(
+      "Temporary card issued",
+      `TTL: ${data.expires_in_seconds || "unknown"} seconds`,
+      data.provider_response || data,
+    );
+    writeLog("Temporary internet card credentials issued.", "success");
+  } catch (error) {
+    writeLog(`Temporary card issue failed: ${error.message}`, "error");
+  }
+});
+
+els.permanentForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const payload = {
+    user_id: document.getElementById("permanent-user-id").value.trim(),
+    account_id: document.getElementById("permanent-account-id").value.trim(),
+    cardholder_name: document.getElementById("permanent-name").value.trim(),
+    card_type: document.getElementById("permanent-card-type").value,
+    delivery_mode: document.getElementById("permanent-delivery-mode").value,
+  };
+
+  try {
+    const data = await postJson("/api/cards/permanent/request", payload);
+    renderProviderPreview(
+      "Permanent card request created",
+      `Provider HTTP status: ${data.provider_http_status || "unknown"}`,
+      data.provider_response || data,
+    );
+    writeLog("Permanent card request sent.", "success");
+  } catch (error) {
+    writeLog(`Permanent card request failed: ${error.message}`, "error");
+  }
+});
+
 els.authForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const payload = {
@@ -185,58 +231,12 @@ els.kycForm.addEventListener("submit", async (event) => {
     );
     if (data.iframe_url) {
       renderCodegoIframe(data);
-      writeLog("Hosted Codego iframe opened in the workspace.", "success");
+      writeLog("Hosted Codego iframe opened in cabinet.", "success");
     } else {
       renderProviderPreview("KYC session response", "Codego returned a session payload.", data);
     }
   } catch (error) {
     writeLog(`Codego KYC session failed: ${error.message}`, "error");
-  }
-});
-
-els.internetForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const payload = {
-    user_id: document.getElementById("internet-user-id").value.trim(),
-    account_id: document.getElementById("internet-account-id").value.trim(),
-    amount_minor: Number(document.getElementById("internet-amount-minor").value),
-    currency: document.getElementById("internet-currency").value,
-    ttl_seconds: Number(document.getElementById("internet-ttl").value),
-  };
-
-  try {
-    const data = await postJson("/api/internet/credentials", payload);
-    renderProviderPreview(
-      "Internet credentials generated",
-      `TTL: ${data.expires_in_seconds || "unknown"} seconds`,
-      data.provider_response || data,
-    );
-    writeLog("Internet card credentials issued.", "success");
-  } catch (error) {
-    writeLog(`Internet credentials failed: ${error.message}`, "error");
-  }
-});
-
-els.permanentForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const payload = {
-    user_id: document.getElementById("permanent-user-id").value.trim(),
-    account_id: document.getElementById("permanent-account-id").value.trim(),
-    cardholder_name: document.getElementById("permanent-name").value.trim(),
-    card_type: document.getElementById("permanent-card-type").value,
-    delivery_mode: document.getElementById("permanent-delivery-mode").value,
-  };
-
-  try {
-    const data = await postJson("/api/cards/permanent/request", payload);
-    renderProviderPreview(
-      "Permanent card requested",
-      `Provider HTTP status: ${data.provider_http_status || "unknown"}`,
-      data.provider_response || data,
-    );
-    writeLog("Permanent card request sent.", "success");
-  } catch (error) {
-    writeLog(`Permanent card request failed: ${error.message}`, "error");
   }
 });
 
@@ -270,9 +270,9 @@ els.sharedKycForm.addEventListener("submit", async (event) => {
     );
     if (data.iframe_url) {
       renderCodegoIframe(data);
-      writeLog("Transit KYC returned a hosted continuation iframe.", "success");
+      writeLog("Transit KYC returned hosted iframe.", "success");
     } else {
-      renderProviderPreview("Transit KYC response", "Provider returned a raw KYC response.", data);
+      renderProviderPreview("Transit KYC response", "Provider returned a raw response.", data);
     }
   } catch (error) {
     writeLog(`Shared KYC transit failed: ${error.message}`, "error");
@@ -290,8 +290,8 @@ window.addEventListener("message", (event) => {
     return;
   }
   if (event.data?.type === "kyc:done") {
-    writeLog("Codego iframe reported kyc:done. Waiting for webhook confirmation.", "info");
+    writeLog("Codego iframe reported kyc:done. Waiting for webhook sync.", "info");
   }
 });
 
-writeLog("Control plane ready. Funding, KYC, and card issue flows are online.", "info");
+writeLog("Client cabinet ready. Funding, cards, and KYC flows are organized by scenario.", "info");
