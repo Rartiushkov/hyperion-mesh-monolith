@@ -20,22 +20,21 @@ function normalizeOrigin(origin, scheme) {
 
 function resolveRoute(url, env) {
   const scheme = env.API_SCHEME || "http";
-  const cisOrigin = normalizeOrigin(env.CIS_API_ORIGIN || "35.226.240.198:8082", scheme);
-  const intlOrigin = normalizeOrigin(
-    env.INTERNATIONAL_API_ORIGIN || "35.226.240.198:8083",
+  const publicOrigin = normalizeOrigin(
+    env.PUBLIC_API_ORIGIN || "35.226.240.198.sslip.io",
     scheme,
   );
 
   if (url.pathname === "/api/aaio/webhook") {
     return {
-      origin: cisOrigin,
+      origin: publicOrigin,
       path: "/aaio/webhook",
     };
   }
 
   if (url.pathname.startsWith("/api/")) {
     return {
-      origin: intlOrigin,
+      origin: publicOrigin,
       path: url.pathname.replace(/^\/api/, ""),
     };
   }
@@ -45,7 +44,7 @@ function resolveRoute(url, env) {
 
 function upstreamOrigin(env) {
   const scheme = env.API_SCHEME || "http";
-  const origin = env.API_ORIGIN || env.INTERNATIONAL_API_ORIGIN || "35.226.240.198:8083";
+  const origin = env.PUBLIC_API_ORIGIN || env.API_ORIGIN || "35.226.240.198.sslip.io";
   if (!origin) {
     return "";
   }
