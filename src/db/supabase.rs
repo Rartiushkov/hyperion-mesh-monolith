@@ -39,7 +39,9 @@ struct UserUpsertPayload<'a> {
 
 #[derive(Serialize)]
 struct UserStatePatch<'a> {
+    #[serde(skip_serializing_if = "Option::is_none")]
     tx_count: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     kyc_level: Option<&'a str>,
 }
 
