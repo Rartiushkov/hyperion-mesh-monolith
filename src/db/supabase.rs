@@ -78,7 +78,10 @@ impl SupabaseClient {
         address_l2: &str,
         initial_kyc_level: &str,
     ) -> Result<(), String> {
-        let url = format!("{}/users", self.rest_url);
+        let mut url = reqwest::Url::parse(&format!("{}/users", self.rest_url))
+            .map_err(|e| format!("supabase users url parse failed: {e}"))?;
+        url.query_pairs_mut()
+            .append_pair("on_conflict", "address_l2");
         let payload = [UserUpsertPayload {
             address_l2,
             tx_count: 0,
